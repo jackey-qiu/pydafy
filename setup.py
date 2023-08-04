@@ -1,10 +1,10 @@
 import os
 from setuptools import setup, find_packages
-install_requires=['numba','ray[default]','psutil','certifi','bcrypt','openpyxl','scikit-learn','pyopengl','imageio','xrayutilities','periodictable','pycifrw','nexusformat','PyMca5','scipy','PyQt5','pyqtgraph==0.11.1','qdarkstyle','pymongo','python-dotenv','pandas','dnspython','click','matplotlib', 'numpy==1.23.5'],
 if os.name=="nt":
-    install_requires = ['opencv-python'] + install_requires
+    opencv = 'opencv-python'
 else:
-    install_requires = ['opencv-python-headless'] + install_requires
+    opencv = 'opencv-python-headless'
+install_requires=[opencv,'Jinja2','numba','ray[default]','psutil','certifi','bcrypt','openpyxl','scikit-learn','pyopengl','imageio','xrayutilities','periodictable','pycifrw','nexusformat','PyMca5','scipy','PyQt5','pyqtgraph==0.11.1','qdarkstyle','pymongo','python-dotenv','pandas','dnspython','click','matplotlib', 'numpy==1.23.5'],
 
 setup(
     name = 'dafy',

@@ -132,7 +132,10 @@ class RunControl(object):
         corr = corr.rename(columns = lambda x:str(int(x)+1))
         self.covariance_matrix = corr
         #cmap: coolwarm, plasma, hsv
-        self.textEdit_cov.setHtml(corr.style.background_gradient(cmap='coolwarm').set_precision(3).render())
+        self.textEdit_cov.setHtml(corr.style.format(precision=2)
+                                      .set_properties(**{'font-size':'10pt'})
+                                      .set_table_styles([{'selector': 'tr:hover','props': 'font-size:5pt'}])
+                                      .background_gradient(cmap='coolwarm').to_html())
 
     #calculate the sensitivity of each fit parameter
     #sensitivity: how much percentage increase of a parameter has to be applied to achived ~10% increase in fom?
