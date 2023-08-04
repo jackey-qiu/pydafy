@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1645</width>
+    <width>1671</width>
     <height>1005</height>
    </rect>
   </property>
@@ -1124,8 +1124,8 @@
                          <rect>
                           <x>0</x>
                           <y>0</y>
-                          <width>715</width>
-                          <height>361</height>
+                          <width>98</width>
+                          <height>28</height>
                          </rect>
                         </property>
                         <attribute name="label">
@@ -1142,8 +1142,8 @@
                          <rect>
                           <x>0</x>
                           <y>0</y>
-                          <width>715</width>
-                          <height>361</height>
+                          <width>98</width>
+                          <height>28</height>
                          </rect>
                         </property>
                         <attribute name="label">
@@ -1793,7 +1793,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1645</width>
+     <width>1671</width>
      <height>21</height>
     </rect>
    </property>
@@ -1973,7 +1973,7 @@
   <customwidget>
    <class>TerminalWidget</class>
    <extends>QWidget</extends>
-   <header>beamtime_manager.widgets.terminal_widget.h</header>
+   <header location="global">dafy.projects.superrod.widgets.terminal_widget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
@@ -1985,13 +1985,13 @@
   <customwidget>
    <class>SolverParameters</class>
    <extends>QWidget</extends>
-   <header>beamtime_manager.widgets.parameter_tree_widget.h</header>
+   <header>dafy.projects.superrod.widgets.parameter_tree_superrod.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>LenseWidget</class>
    <extends>QWidget</extends>
-   <header>beamtime_manager.widgets.lense_demo.h</header>
+   <header>dafy.projects.archiver.widgets.lense_demo.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
