@@ -8,7 +8,7 @@ import copy
 from scipy.spatial.distance import pdist
 from scipy.stats import multivariate_normal
 import itertools
-from OpenGL.GL import *
+# from OpenGL.GL import *
 import matplotlib.pyplot as plt
 #color_lib = {'C':(1,0,0,1),'O':(0,1,0,1),'Cu':(1,0,1,1)}
 # color_lib = {'C':0xFFFFFF,'O':(0,1,0,1),'Cu':(1,0,1,1)}

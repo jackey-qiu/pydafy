@@ -111,7 +111,7 @@ class GuiOperations(object):
         _, dirs_, filenames =  next(walk(os.path.join(DaFy_path,'resources','cif')), (None, None, []))
         for file in filenames:
             if file.endswith('.str') or file.endswith('.cif'):
-                temp_dict[file] = os.path.join(DaFy_path, 'core','util', 'cif',file)
+                temp_dict[file] = os.path.join(DaFy_path, 'resources', 'cif',file)
         for dir_ in dirs_:
             _, _, filenames =  next(walk(os.path.join(DaFy_path, 'resources','cif', dir_)), (None, None, []))
             for file in filenames:

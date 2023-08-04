@@ -9,7 +9,8 @@ setup(
     classifiers=['Topic :: x ray data analysis',
                  'Programming Language :: Python'],
     license='MIT',
-    install_requires=['PyQt5','pyqtgraph','qdarkstyle','pymongo','python-dotenv','pandas','dnspython'],
+    python_requires='>=3.9.13, <3.10',
+    install_requires=['numba','ray[default]','psutil','certifi','bcrypt','openpyxl','scikit-learn','pyopengl','opencv-python','imageio','xrayutilities','periodictable','pycifrw','nexusformat','PyMca5','scipy','PyQt5','pyqtgraph==0.11.1','qdarkstyle','pymongo','python-dotenv','pandas','dnspython','click','matplotlib', 'numpy==1.23.5'],
     packages=find_packages(),
     package_data={'':['*.ui','*.ini','*.dat', '*.cif'],'dafy.projects.xrv':['icons/*.*','config/config_file_XRV_standard.ini','ui/*.ui'], 'dafy.projects.superrod':['icons/*.*'],\
                   'dafy.projects.ubmate':['icons/*.*'],'dafy.projects.ctr':['icons/*.*','config/*.ini','ui/*.ui'],'dafy.projects.viewer':['icons/*.*','config/*.ini','ui/*.ui'],\

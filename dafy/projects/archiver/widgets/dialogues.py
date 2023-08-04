@@ -6,7 +6,7 @@ from pymongo import MongoClient
 import certifi, urllib
 from ..core.util import error_pop_up, confirm_password, encrypt_password
 from ..config.config import hidden_pushButtons_normal_user
-import beamtime_manager.core.db_operations as db
+import dafy.projects.archiver.core.db_operations as db
 
 ui_path = str(Path(__file__).parent.parent/ "ui")
 
