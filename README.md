@@ -1,7 +1,7 @@
 DaFy is a Python software package that contains a bunch of PyQt5-based APPs for processing synchrotron X-ray data. 
 Refer to https://github.com/jackey-qiu/DaFy/wiki for more details.
 
-In pydafy project, the constituent software components in original DaFy repo have been restructured/cleaned up/optimized to make it scarable and easier to understand.
+In pydafy project, the constituent software components in original DaFy repo have been restructured/cleaned up/optimized to make it scalable, extendable, and easier to understand.
 
 **To install and use pydafy:**
 
