@@ -54,7 +54,7 @@ class RunApp(object):
         self.peak_fitting_instance = XRD_Peak_Fitting(img = None, cen=self.cen_clip, kwarg = self.kwarg_peak_fit, use_q_mapping = self.use_q_mapping, rsp_mapping = self.rsp_instance)
         self.img_loader = eval(self.img_loader_object)(clip_boundary = self.clip_boundary, kwarg = self.kwarg_image)
         self.create_mask_new = create_mask(kwarg = self.kwarg_mask)
-        self.lattice_skin = rsp.lattice.from_cif(os.path.join(DaFy_path, 'resource','cif',"{}".format(self.kwarg_film['film_material_cif'])),
+        self.lattice_skin = rsp.lattice.from_cif(os.path.join(DaFy_path, 'resources','cif',"{}".format(self.kwarg_film['film_material_cif'])),
                                             HKL_normal=self.kwarg_film['film_hkl_normal'],\
                                             HKL_para_x=self.kwarg_film['film_hkl_x'],\
                                             E_keV=self.rsp_instance.e_kev, offset_angle=0)
@@ -97,7 +97,7 @@ class RunApp(object):
         self.writer = pd.ExcelWriter([path+'.xlsx',path][int(path.endswith('.xlsx'))],engine = 'openpyxl',mode ='w')
         with self.writer as writer:
             pd.DataFrame(self.data).to_excel(writer,sheet_name='CV_XRD_data',columns = self.kwarg_global['data_keys'])
-            writer.save()
+            # writer.save()
 
 
 
