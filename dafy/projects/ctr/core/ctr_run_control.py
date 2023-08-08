@@ -142,7 +142,7 @@ class RunApp(object):
         self.writer = pd.ExcelWriter([path+'.xlsx',path][int(path.endswith('.xlsx'))],engine = 'openpyxl',mode ='w')
         with self.writer as writer:
             pd.DataFrame(self.data).to_excel(writer,sheet_name='CTR_data',columns = self.data_keys)
-            writer.save()
+            # writer.save()
         #now empty the data container
         #for key in self.data_keys:
         #    self.data[key]=[self.data[key][-1]]
