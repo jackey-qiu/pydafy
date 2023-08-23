@@ -1171,7 +1171,7 @@
                 </font>
                </property>
                <property name="currentIndex">
-                <number>0</number>
+                <number>1</number>
                </property>
                <widget class="QWidget" name="tab_2">
                 <attribute name="title">
@@ -1985,7 +1985,7 @@
   <customwidget>
    <class>SolverParameters</class>
    <extends>QWidget</extends>
-   <header>dafy.projects.superrod.widgets.parameter_tree_superrod.h</header>
+   <header>dafy.projects.archiver.widgets.parameter_tree_widget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

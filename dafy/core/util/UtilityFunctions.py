@@ -1130,22 +1130,6 @@ class nexus_image_loader(object):
         self.flip = flip
         self.transpose = transpose
 
-    def update_scan_info_old(self,scan_number):
-        self.scan_number = scan_number
-        print('\nRunning scan {} now...'.format(scan_number))
-        img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,scan_number)
-        img_name_1='{}_{:0>5}_00000.nxs'.format(self.frame_prefix,scan_number)
-        img_path=os.path.join(self.nexus_path,img_name)
-        img_path_1=os.path.join(self.nexus_path,img_name.replace(".nxs",""),'lmbd',img_name_1)
-        self.nexus_data = nxload(img_path)
-        self.nexus_data_1 = nxload(img_path_1)
-        self.get_frame_number()
-        self.extract_pot_profile()
-        if self.check_abnormality:
-            self.abnormal_range = remove_abnormality_2(mon = self.extract_beam_mon_ct(),left_offset = self.left_offset, right_offset = self.right_offset)
-        else:
-            self.abnormal_range = [-10,-1]
-
     def update_scan_info(self,scan_number):
         self.scan_number = scan_number
         print('\nRunning scan {} now...'.format(scan_number))
