@@ -42,6 +42,64 @@ import matplotlib.pyplot as plt
 import matplotlib.collections as mcoll
 import matplotlib.path as mpath
 from PyQt5.QtWidgets import QMessageBox
+from functools import wraps
+
+class DocInherit(object):
+    """
+    doc_inherit decorator
+
+    Usage:
+
+    class Foo(object):
+        def foo(self):
+            "Frobber"
+            pass
+
+    class Bar(Foo):
+        @DocInherit
+        def foo(self):
+            pass 
+
+    Now, Bar.foo.__doc__ == Bar().foo.__doc__ == Foo.foo.__doc__ == "Frobber"
+    """
+
+    def __init__(self, mthd):
+        self.mthd = mthd
+        self.name = mthd.__name__
+
+    def __get__(self, obj, cls):
+        if obj:
+            return self.get_with_inst(obj, cls)
+        else:
+            return self.get_no_inst(cls)
+
+    def get_with_inst(self, obj, cls):
+
+        overridden = getattr(super(cls, obj), self.name, None)
+
+        @wraps(self.mthd, assigned=('__name__','__module__'))
+        def f(*args, **kwargs):
+            return self.mthd(obj, *args, **kwargs)
+
+        return self.use_parent_doc(f, overridden)
+
+    def get_no_inst(self, cls):
+
+        for parent in cls.__mro__[1:]:
+            overridden = getattr(parent, self.name, None)
+            if overridden: break
+
+        @wraps(self.mthd, assigned=('__name__','__module__'))
+        def f(*args, **kwargs):
+            return self.mthd(*args, **kwargs)
+
+        return self.use_parent_doc(f, overridden)
+
+    def use_parent_doc(self, func, source):
+        if source is None:
+            raise NameError("Can't find '%s' in parents"%self.name)
+        func.__doc__ = source.__doc__
+        return func
 
 def error_pop_up(msg_text = 'error', window_title = ['Error','Information','Warning'][0]):
     msg = QMessageBox()
@@ -955,520 +1013,501 @@ class nexus_image_loader_diffabs(object):
                     dead_pix_container.remove(each)
         return dead_pix_container
 
-class nexus_image_loader_old(object):
-    def __init__(self, clip_boundary, FioFile, kwarg):
-        # self.fio_path=fio_path
-        # self.nexus_path=nexus_path
-        # self.frame_prefix=frame_prefix
-        # self.spec = Fio.FioFile(fio_path)
-        # self.motor_angles = motor_angles
-        # self.get_frame_number()
-        self.abnormal_range = [0,0]
-        self.FioFile = FioFile
+class imagePreprocessing():
+
+    @staticmethod
+    def flip(img):
+        return np.flip(img, 1)
+    
+    @staticmethod
+    def transpose(img):
+        return img.T
+    
+    @staticmethod
+    def crop(img, crop_boundary):
+        dim_ver, dim_hor = img.shape
+        crop_ver = [0, dim_ver]
+        crop_hor = [0, dim_hor]
+        crop_ver = [max(crop_boundary['ver'][0], crop_ver[0]),min(crop_boundary['ver'][1], crop_ver[1])]
+        crop_hor = [max(crop_boundary['hor'][0], crop_hor[0]),min(crop_boundary['hor'][1], crop_hor[1])]
+
+        return img[crop_ver[0]:crop_ver[1],
+                   crop_hor[0]:crop_hor[1]]
+    
+    @staticmethod
+    def normalize(img, factor):
+        return img/factor
+
+    @staticmethod
+    def remove_lines(img, dir = 'hor', line_ix = []):
+        if dir=='hor':
+            ax = 0
+        elif dir=='ver':
+            ax = 1
+        return np.delete(img, line_ix, ax)
+
+class imageLoaderBase(imagePreprocessing):
+    """base class for image loader, not to be used directly but be inherited by subclasses
+
+    Args:
+        imagePreprocessing (class): image processing class, which contain classmethods corresponding to different algorithms for image processing
+    
+    usage:
+        1. creat a new class by inheriting this class
+        2. in the newly created class implement all unimplemented functions in this parent class
+        3. in the client side, init the new class, eg loader = new_img_loader(crop_boundary = {}, kwarg = {})
+        4. start a scan by calling loader.update_scan_info(scan_number = 200)
+        5. get the img generator by calling imgs = loader.load_frame(frame_number = 0)
+        6. To loop through the generator, use img = next(imgs) to get the next image
+    """
+    def __init__(self, crop_boundary = {'ver':[0,100000000],'hor':[0,100000000]}, kwarg = {}):
+        """constructor function
+
+        Args:
+            crop_boundary (dict, optional): Defaults to {'ver':[0,100000000],'hor':[0,100000000]} (arbitrarily large crop area-> no crop).
+            kwarg (dict, optional): extra instance attribute for subclasses. Defaults to {}.
+        """
+        self.validate_crop_boundary(crop_boundary)
+        self.crop_boundary = crop_boundary
+        self.validate_kwarg(kwarg)
         self.scan_number = None
-        self.frame_number = None
-        self.img_structure = 'one'#by default all images saved in one nexus file
-        self.potential = None
-        self.current = None
-        self.hkl = None
-        self.clip_boundary = clip_boundary
-        self.potential_profile_cal = None
-        self.potential_profile = None
-        self.potential_cal = None
+        self.current_frame_number = None
+        self.total_frame_number = None
+        self.scan_meta_data = None
+        self.scan_img_data = None
         for key in kwarg:
             setattr(self, key, kwarg[key])
 
-    def get_frame_number(self):
-        image_path = os.path.join(self.nexus_path,'{}_{:0>5}/lmbd'.format(self.frame_prefix,self.scan_number))
-        total_img_number = len(os.listdir(image_path))
-        if total_img_number ==1:
-            img_name = os.listdir(self.nexus_path)[0]
-            img_path=os.path.join(self.nexus_path,img_name)
-            data=nxload(img_path)
-            total_img_number = len(np.array(data.entry.instrument.detector.data))
-        self.total_frame_number = total_img_number
-        return self.total_frame_number
+    def validate_kwarg(self, kwarg):
+        """validate the kwarg for the subclass image loader, it should be customized according to user needs
 
-    def update_scan_info(self,scan_number):
-        self.fio_path = os.path.join(self.nexus_path,'startup','{}_{:0>5}.fio'.format(self.frame_prefix,scan_number))
-        self.spec = self.FioFile(self.fio_path)
-        img_path = os.path.join(self.nexus_path,'{}_{:0>5}/lmbd'.format(self.frame_prefix,scan_number))
-        self.scan_number = scan_number
-        print('\nRunning scan {} now...'.format(scan_number))
-        img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,scan_number)
-        img_name_1='{}_{:0>5}_00000.nxs'.format(self.frame_prefix,scan_number)
-        # img_path=os.path.join(self.nexus_path,img_name)
-        img_path_1=os.path.join(self.nexus_path,img_name.replace(".nxs",""),'lmbd',img_name_1)
-        # self.nexus_data = nxload(img_path)
-        self.nexus_data_1 = nxload(img_path_1)
-        self.get_frame_number()
-        if abs(self.total_frame_number - self.nexus_data_1.entry.instrument.detector.data.shape[0])>2:
-            self.img_structure = 'multiple'#means each image correspond to one nexus fle
-        self.extract_pot_profile()
+        Args:
+            kwarg (dict): contain extra instance attribute info
 
-    def extract_pot_profile(self):
-        results = self.spec.extract_pot_profile(self.scan_number)
-        self.potential_profile = results
-        self.potential_profile_cal = FitEnginePool.fit_pot_profile(list(range(len(results))),results, show_fig = False)
+        Raises:
+            NotImplementedError: _description_
 
-    def extract_motor_angles(self, frame_number):
-        self.motor_angles = self.spec.extract_motor_angle(self.motor_angles,self.scan_number,frame_number,['mu','delta','gamma','omega_t'])
-        self.motor_angles['mon'] = 1
-        self.motor_angles['transm'] = 1
-        self.motor_angles['time'] = self.spec.get_col('timestamp')[frame_number] 
-        return self.motor_angles
+        """
+        raise NotImplementedError
+    
+    def validate_crop_boundary(self, crop_boundary):
+        """to validate the crop boundary argument
 
-    def extract_pot_current(self, frame_number):
-        results = self.spec.extract_pot_current(self.scan_number, frame_number)
-        self.potential, self.current = results
-        try:
-            self.potential_cal = self.potential_profile_cal[frame_number]
-        except:
-            self.potential_cal = results[0]
-            print('Use real potential for the potential_cal')
-        return results
+        Args:
+            crop_boundary (dict): crop_boundary
 
-    def extract_HKL(self, frame_number):
-        self.hkl = (0,0,0)
-        return 0,0,0
+        Raises:
+            LookupError: 2 items assertion in crop_boundary['ver']
+            LookupError: 'ver' key assertion in crop_boundary dict
+            LookupError: 2 items assertion in crop_boundary['hor']
+            LookupError: 'hor' key assertion in crop_boundary dict
+            LookupError: dict type assertion for crop_boundary
 
-    def load_frame(self,frame_number,flip=True):
-        while frame_number < self.total_frame_number:
-            if self.img_structure == 'multiple':
-                #if one frame one nxs file
-                folder_name = '{}_{:0>5}'.format(self.frame_prefix,self.scan_number)
-                img_name='{}_{:0>5}_{:0>5}.nxs'.format(self.frame_prefix,self.scan_number,frame_number)
-                img_path=os.path.join(self.nexus_path,folder_name, 'lmbd', img_name)
-                data=nxload(img_path)
-                img=np.array(data.entry.instrument.detector.data.nxdata[0])
+        Returns:
+            _type_: _description_
+        """
+        if isinstance(crop_boundary, dict):
+            if 'ver' in crop_boundary:
+                if len(crop_boundary['ver'])!=2:
+                    raise LookupError("The vertical boundary dimention is not 2, don't crop image in vertical direction")
             else:
-                #if all frames in one nxs file
-                folder_name = '{}_{:0>5}'.format(self.frame_prefix,self.scan_number)
-                img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,self.scan_number)
-                img_path=os.path.join(self.nexus_path,folder_name, 'lmbd', img_name)
-                data=nxload(img_path)
-                img=np.array(data.entry.instrument.detector.data[frame_number])
-            self.extract_motor_angles(frame_number)
-            self.extract_pot_current(frame_number)
-            self.extract_HKL(frame_number)
-            self.frame_number = frame_number
-            if flip:
-                img = np.flip(img.T,1)
-            img = img[self.clip_boundary['ver'][0]:self.clip_boundary['ver'][1],
-                    self.clip_boundary['hor'][0]:self.clip_boundary['hor'][1]]
-            #yield img/self.motor_angles['mon']/self.motor_angles['transm']
-            yield img
-            frame_number +=1
-
-    def load_frame_from_path(self,img_path,frame_number = 0,flip=True):
-        try:
-            #if one frame one nxs file
-            data=nxload(img_path)
-            img=np.array(data.entry.instrument.detector.data.nxdata[0])
-        except:
-            #if all frames in one nxs file
-            data=nxload(img_path)
-            img=np.array(data.entry.instrument.detector.data[frame_number])
-        if flip:
-            return np.flip(img.T,1)
+                raise LookupError("No 'ver' key in the crop_broundary, don't crop image in the vertical direction!")
+            if 'hor' in crop_boundary:
+                if len(crop_boundary['hor'])!=2:
+                    raise LookupError("The horizontal boundary dimention is not 2, don't crop image in horizontal direction")
+            else:
+                raise LookupError("No 'hor' key in the crop_broundary, don't crop image in the horizontal direction!")
         else:
-            return img
+            raise LookupError("The argument crop_boundary must be a dictionary. No cropping will take place!")
+        return True
+    
+    def update_scan_info(self,scan_number):
+        """the entry point to start loading a scan data: update scan_number
+                                                         extract scan data (img and meta)
+                                                         update the total frame number
 
-    def show_frame(self,scan_number,frame_number,one_frame_in_one_nxs=True,flip=True):
-        img=self.load_frame(scan_number,frame_number,one_frame_in_one_nxs,flip)
-        fig,ax=pyplot.subplots()
-        pyplot.imshow(img,cmap='jet')
-        if flip:
-            pyplot.colorbar(extend='both',orientation='vertical')
-        else:
-            pyplot.colorbar(extend='both',orientation='horizontal')
-        pyplot.clim(0,205)
-        # pyplot.show()
+        Args:
+            scan_number (int): scan number of the scan to be worked on
+        """ 
+        self.scan_number = scan_number
+        print('\nRunning scan {} now...'.format(scan_number))
+        self._extract_scan_data(scan_number)
+        self.total_frame_number = self._get_total_frame_number()
+
+    def load_frame(self, frame_number):
+        """an interator to loop through all images starting from frame_number index
+
+        Args:
+            frame_number (int): the frame index where the loop will start with
+
+        Yields:
+            img (numpy array 2d): the processed image
+        """
+        while frame_number < self.total_frame_number:
+            self.current_frame_number = frame_number 
+            img = self._extract_one_img(frame_number)
+            self._extract_meta_data_for_one_img(frame_number)
+            pars = self._prepare_preprocessing_pipline_parameters()
+            yield self._preprocess_img(img = img, pars = pars)
+            frame_number +=1    
+
+    def _extract_one_img(frame_number):
+        """extract one image data from scan_img_data
+
+        Args:
+            frame_number (int): frame index
+
+        Raises:
+            NotImplementedError: to be implemented in subclass
+
+        Returns:
+            img (numpy array of 2d): img value in numpy array
+        """
+        raise NotImplementedError
+
+    def _preprocess_img(self, img, pipline = [], pars = {}):
+        """pipline to process one image
+
+        Args:
+            img (numpy array of 2d): the image to be processed
+            pipline (list, optional): specifiy the processing algorithms to be applied on the img, 
+                                      if am empty list, will use the key list of pars argument instead
+            pars (dict): the parameter signature for processsing an img, for more details read docstring of _prepare_preprocessing_pipline_parameters
+
+        Returns:
+            processed img (numpy array 2d): processed image array
+        """
+        if len(pipline)==0:
+            pipline = list(pars.keys())
+        for each in pipline:
+            assert each in pars, f"Please provie the associated pars for preprocessing func {each}"
+            assert getattr(super(), each), f"the preprocessing func {each} is not implimented yet."
+        for each in pipline:
+            img = getattr(super(), each)(img, **pars[each])
         return img
+    
+    def _extract_scan_data(self, scan_number = None):
+        """wrapper func to extract scan data (img and meta data)
 
-    def find_dead_pix(self,scan_number=666,img_end=100):
-        dead_pix_container=self.load_frame(scan_number,0)==self.load_frame(scan_number,1)
-        dead_pix_container=np.where(dead_pix_container==True)
-        dead_pix_container=zip(tuple(dead_pix_container[0]),tuple(dead_pix_container[1]))
-        img0= self.load_frame(scan_number,0)
-        print(len(dead_pix_container))
-        for i in range(2,img_end):
-            print('Processing img_',i)
-            img = self.load_frame(scan_number,i)
-            temp= img != img0
-            temp= np.where(temp==True)
-            temp= zip(tuple(temp[0]),tuple(temp[1]))
-            for each in temp:
-                if each in dead_pix_container:
-                    dead_pix_container.remove(each)
-        return dead_pix_container
+        Args:
+            scan_number (int or None): Defaults to None. if None, use self.scan_number instead.
+        """
+        if scan_number == None:
+            scan_number = self.scan_number
+        else:
+            self.scan_number = scan_number
+        self._extract_img_data(scan_number)
+        self._extract_meta_data(scan_number)
+    
+    def _extract_img_data(self, scan_number):
+        """extract all images for a specific scan_number
 
-class nexus_image_loader(object):
-    def __init__(self,clip_boundary,kwarg):
-        # self.nexus_path=nexus_path
-        # self.frame_prefix=frame_prefix
-        self.scan_number = None
-        self.frame_number = None
-        self.img_structure = 'one'#by default all images saved in one nexus file
+        Args:
+            scan_number (int): scan number without heading 0s
+            eg the real scan number is 00021, you should write it as 21
+
+        Raises:
+            NotImplementedError: implemented in the subclass
+
+        Returns:
+            None: The extracted value should be stored in scan_img_data instance attribute
+        """
+        raise NotImplementedError
+
+    def _extract_meta_data(self, scan_number):
+        """extract all meta data for data of scan_number
+
+        Args:
+            scan_number (_type_):  scan_number (int): scan number without heading 0s
+            eg the real scan number is 00021, you should write it as 21
+
+        Raises:
+            NotImplementedError: implemented in the subclass
+
+        Returns (None): the extracted value should be saved as scan_meta_data instance attribute
+        """
+        raise NotImplementedError
+
+    def _extract_meta_channel_data(self, channel_name, frame_number):
+        """extract meta data of a specific channel (channel_name)
+           you must already have extract the meta data using _extract_meta_data before calling this func
+
+        Args:
+            channel_name (str): the name of the channel
+            frame_number (int or None): if None, extract all frames within the meta data, if int, extract that specific data point
+                   
+        Raises:
+            NotImplementedError: implemented in the subclass
+
+        Returns:
+            meta data (any): the meta data of the specificed channel and frame_number
+        """
+        raise NotImplementedError
+    
+    def _get_total_frame_number(self, scan_number):
+        """get the total fame number for a specific scan
+
+        Args:
+            scan_number (int): which scan you would like to work on
+
+        return:
+            total frame number (int): implemented in the subclass
+        """
+        raise NotImplementedError
+    
+    def _prepare_preprocessing_pipline_parameters(self):
+        """prepare a dict for imag processing
+
+        return:
+            dict sig (dict): signature for image processing
+                            key (str): one of class method names in its parent class
+                            value (dict): {parameter: argument} where keys are function parameters (except for img)
+                                          values are the associated arguments passed into the function
+        """
+        raise NotImplementedError
+    
+    def _extract_one_img_file(self, scan_number, frame_number):
+        """extract one image file, which could contain multile images or only one image
+
+        Args:
+            scan_number (int): scan_number
+            frame_number (int): frame number
+
+        Return:
+            image data container (any): can be list or dict or any format which will comply with the image extracting approach to be implemented in _extract_one_img func
+        """
+        raise NotImplementedError
+
+    def _extract_meta_data_for_one_img(self, frame_number):
+        """extract meta info for one img
+
+        Args:
+            frame_number (int): the index of the frame to be worked on
+
+        Return:
+            None: the extractd meta data value should be stored as instance attr somehow
+        """
+        raise NotImplementedError
+    
+class nexus_image_loader(imageLoaderBase):
+    """image loader that work with nexus data format
+
+    Args:
+        imageLoaderBase (class): base class
+
+    Attributes:
+        meta_data_name_format: predefined string format for a nxs meta data file, two placeholders for common frame heading string and scan number
+        img_data_name_format: predefined string format for a image nxs data file, three placehoders for common heading str, scan number and frame number
+        img_structure: either 'one' or 'multiple', depending whether or not the image nx file contain one or multiple images
+        meta_data_fetch_path_map: fetching path (first item in the list) for different channels (keys in the dict), and the default value (second item in the list)
+    """
+    meta_data_name_format = '{}_{:0>5}.nxs'
+    img_data_name_format = '{}_{:0>5}_{:0>5}.nxs'
+    img_structure = 'one'
+    meta_data_fetch_path_map = {
+                      'mon':['scan/data/eh_c01',1],
+                      'atten': ['scan/data/atten',1],
+                      'time': ['scan/data/timestamp', None],
+                      'potential': ['scan/data/voltage2', 0],
+                      'current': ['scan/data/voltage1',0],
+                      'H' : ['scan/data/diffractometer_h', None],
+                      'K' : ['scan/data/diffractometer_k', None],
+                      'L' : ['scan/data/diffractometer_l', None],
+                      'phi': ['scan/data/phi', None],
+                      'chi': ['scan/data/chi', None],
+                      'delta': ['scan/data/delta', None],
+                      'gamma': ['scan/data/gamma', None],
+                      'mu': ['scan/data/mu', None],
+                      'omega_t': ['scan/data/omega_t', None],
+                      'omega': ['scan/data/omega', None],
+                     }
+
+    def __init__(self,crop_boundary,kwarg):
+        super().__init__(crop_boundary = crop_boundary, kwarg = kwarg)
         self.potential = None
         self.current = None
         self.hkl = None
-        self.clip_boundary = clip_boundary
         self.potential_profile_cal = None
         self.potential_profile = None
         self.potential_cal = None
-        for key in kwarg:
-            setattr(self, key, kwarg[key])
-        # self.constant_motors = constant_motors
-        #load nexus data only once here
-        #img_name='{}_{:0>5}.nxs'.format(frame_prefix,scan_number)
-        #img_path=os.path.join(self.nexus_path,img_name)
-        #self.nexus_data = nxload(img_path)
-        #self.get_frame_number()
 
-    def set_flip_transpose(self, flip, transpose):
-        self.flip = flip
-        self.transpose = transpose
+    @DocInherit
+    def validate_kwarg(self, kwarg):
+        assert 'nexus_path' in kwarg, 'nexus_path is needed in the dict kwarg'
+        assert 'frame_prefix' in kwarg, 'frame_prefix is needed in the dict kwarg'
+        assert 'constant_motors' in kwarg, 'constant_motors (dict) is needed in the dict kwarg'
+        assert os.path.exists(kwarg['nexus_path']), f"The nexus_path {kwarg['nexus_path']} is not existing!"
 
-    def update_scan_info(self,scan_number):
-        self.scan_number = scan_number
-        print('\nRunning scan {} now...'.format(scan_number))
-        img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,scan_number)
-        img_name_1='{}_{:0>5}_00000.nxs'.format(self.frame_prefix,scan_number)
-        img_path=os.path.join(self.nexus_path,img_name)
-        img_path_1=os.path.join(self.nexus_path,img_name.replace(".nxs",""),'lmbd',img_name_1)
-        self.nexus_data = nxload(img_path)
-        self.nexus_data_1 = nxload(img_path_1)
-        self.get_frame_number()
-        if len(os.listdir(os.path.join(self.nexus_path,img_name.replace(".nxs",""),'lmbd'))) == 1:
-            self.img_structure = 'one'
-            #update the total frame_number to whichever smaller
-            self.total_frame_number =min(self.total_frame_number, self.nexus_data_1.entry.instrument.detector.data.shape[0])
-        else:
-            self.img_structure = 'multiple'
-            #update the total frame_number to whichever smaller
-            self.total_frame_number = min(self.total_frame_number, len(os.listdir(os.path.join(self.nexus_path,img_name.replace(".nxs",""),'lmbd'))))
-        # if abs(self.total_frame_number - self.nexus_data_1.entry.instrument.detector.data.shape[0])>2:
-            # self.img_structure = 'multiple'#means each image correspond to one nexus fle
-        self.extract_pot_profile()
-        if self.check_abnormality:
-            self.abnormal_range = remove_abnormality_2(mon = self.extract_beam_mon_ct(),left_offset = self.left_offset, right_offset = self.right_offset)
-        else:
-            self.abnormal_range = [-10,-1]
+    @DocInherit
+    def _get_total_frame_number(self, scan_number = None):
+        if scan_number == None:
+            scan_number = self.scan_number
+        self._extract_meta_data(scan_number)
+        return len(self._extract_meta_channel_data('mon'))
 
-    def get_frame_number(self):
-        #total_img_number = len(os.listdir(self.nexus_path))
-        #if total_img_number ==1:
-            #img_name = os.listdir(self.nexus_path)[0]
-            #img_path=os.path.join(self.nexus_path,img_name)
-            #data=nxload(img_path)
-            #try:
-            #    total_img_number = len(np.array(self.nexus_data.entry.instrument.detector.data))
-            #except:
-            #    total_img_number = len(np.array(self.nexus_data.scan.data.atten))
-            #total_img_number = len(np.array(self.nexus_data.scan.data.atten))
-            #print(total_img_number)
-        total_img_number = len(np.array(self.nexus_data.scan.data.eh_c01))
-        self.total_frame_number = total_img_number
-        return total_img_number
+    @DocInherit
+    def _extract_one_img(self, frame_number):
+        if self.img_structure == 'multiple':
+            #self.scan_img_data = self._extract_one_img_file(self.scan_number, frame_number)
+            img=self.scan_img_data[frame_number].entry.instrument.detector.data._get_filedata(0)
+        elif self.img_structure == 'one':
+            img=self.scan_img_data.entry.instrument.detector.data._get_filedata(frame_number)
+            if img is None:
+                img=self.scan_img_data.entry.instrument.detector.data._get_filedata(frame_number-1)  
+        return img      
 
-    def load_frame_old(self,scan_number,frame_number):
+    @DocInherit
+    def _extract_meta_data_for_one_img(self, frame_number):
+        self._extract_motor_angles(frame_number)
+        self._extract_pot_current(frame_number)
+        self._extract_HKL(frame_number)
+
+    @DocInherit
+    def _prepare_preprocessing_pipline_parameters(self):
+        return   {
+                   'transpose': {},
+                   'flip': {},
+                   'crop': {'crop_boundary': self.crop_boundary},
+                   'normalize': {'factor': self.motor_angles['scaling_factor']}
+                  }
+
+    @DocInherit
+    def _extract_one_img_file(self, scan_number, frame_number):
+        file_name = self.img_data_name_format.format(self.frame_prefix, scan_number, frame_number)
+        folder_name = self.meta_data_name_format.format(self.frame_prefix, scan_number)
+        return nxload(os.path.join(self.nexus_path, folder_name.replace('.nxs',''), 'lmbd', file_name))
+
+    @DocInherit
+    def _extract_img_data(self, scan_number):
+        if self.img_structure=='one':
+            self.scan_img_data = self._extract_one_img_file(scan_number, 0)
+        elif self.img_structure == 'multiple':
+            self.scan_img_data = [self._extract_one_img_file(scan_number, i) for i in range(self.get_total_frame_number(scan_number))]
+
+    @DocInherit
+    def _extract_meta_data(self, scan_number):
+        file_name = self.meta_data_name_format.format(self.frame_prefix, scan_number)
+        self.scan_meta_data = nxload(os.path.join(self.nexus_path, file_name))
+        self._extract_pot_profile()
+
+    @DocInherit
+    def _extract_meta_channel_data(self, channel_name, frame_number = None):
+        if channel_name not in self.meta_data_fetch_path_map:
+            raise ValueError(f'The {channel_name} is not exising in the meta_data_fetch_path_map!')
+        fetch_path, _ = self.meta_data_fetch_path_map[channel_name]
         try:
-            #if one frame one nxs file
-            img_name='{}_{:0>5}_{:0>5}.nxs'.format(self.frame_prefix,scan_number,frame_number)
-            img_path=os.path.join(self.nexus_path,img_name)
-            data=nxload(img_path)
-            img=np.array(data.entry.instrument.detector.data.nxdata[0])
+            _ = self.scan_meta_data[fetch_path]
         except:
-            #if all frames in one nxs file
-            img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,scan_number)
-            img_path=os.path.join(self.nexus_path,img_name)
-            data=nxload(img_path)
-            img=np.array(data.entry.instrument.detector.data[frame_number])
-        if self.flip and self.transpose:
-            return np.flip(img.T,1)
-        elif self.flip and (not self.transpose):
-            return np.flip(img, 1)
-        elif (not self.flip) and self.transpose:
-            return img.T
+            raise Exception('Could not extract the required data from nx file')
+        if frame_number != None:
+            if type(frame_number)==int:
+                return np.array(self.scan_meta_data[fetch_path])[frame_number]
+            else:
+                raise ValueError(f'frame_number has to be integer, but you have {frame_number}')
         else:
-            return img
+            return np.array(self.scan_meta_data[fetch_path])
 
-    def load_frame_new(self,frame_number,clip_boundary = {'ver':[0,10000],'hor':[0,10000]}):
-        #if one frame one nxs file
-        #img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,scan_number)
-        #img_path=os.path.join(self.nexus_path,img_name)
-        #data=nxload(img_path)
-        #img=np.array(data.entry.instrument.detector.data.nxdata[0])
-        img=np.array(self.nexus_data.scan.data.lmbd)[frame_number]
-        if self.flip and self.transpose:
-            img = np.flip(img.T,1)
-        elif self.flip and (not self.transpose):
-            img = np.flip(img, 1)
-        elif (not self.flip) and self.transpose:
-            img = img.T
-        img = img[clip_boundary['ver'][0]:clip_boundary['ver'][1],clip_boundary['hor'][0]:clip_boundary['hor'][1]]
-        return img
+    def _extract_motor_angles(self, frame_number):
+        """extract motor angles
 
-    def load_one_frame(self,frame_number):
-        #if one frame one nxs file
-        #img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,scan_number)
-        #img_path=os.path.join(self.nexus_path,img_name)
-        #data=nxload(img_path)
-        #img=np.array(data.entry.instrument.detector.data.nxdata[0])
-        if self.img_structure=='one':
-            if (frame_number < self.total_frame_number) and (frame_number >= 0):
-                img=self.nexus_data_1.entry.instrument.detector.data._get_filedata(frame_number)
-                #print(self.nexus_data_1.entry.instrument.detector.data.shape)
-                #print(img)
-                if img is None:
-                    img=self.nexus_data_1.entry.instrument.detector.data._get_filedata(frame_number-1)
-                if self.flip and self.transpose:
-                    img = np.flip(img.T,1)
-                elif self.flip and (not self.transpose):
-                    img = np.flip(img, 1)
-                elif (not self.flip) and self.transpose:
-                    img = img.T
-                img = img[self.clip_boundary['ver'][0]:self.clip_boundary['ver'][1],
-                        self.clip_boundary['hor'][0]:self.clip_boundary['hor'][1]]
-                #normalized the intensity by the monitor and trams counters
-                self.extract_motor_angles(frame_number)
-                self.extract_pot_current(frame_number)
-                self.extract_HKL(frame_number)
-                return img/self.extract_transm_and_mon(frame_number)
+        Args:
+            frame_number (int): frame index
 
-        elif self.img_structure == 'multiple':
-            if (frame_number < self.total_frame_number) and (frame_number >= 0):
-                img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,self.scan_number)
-                img_name_1='{}_{:0>5}_{:0>5}.nxs'.format(self.frame_prefix,self.scan_number,frame_number)
-                #print(img_name_1,img_name)
-                img_path_1=os.path.join(self.nexus_path,img_name.replace(".nxs",""),'lmbd',img_name_1)
-                self.nexus_data_1 = nxload(img_path_1)
-                img=self.nexus_data_1.entry.instrument.detector.data._get_filedata(0)
-                if self.flip and self.transpose:
-                    img = np.flip(img.T,1)
-                elif self.flip and (not self.transpose):
-                    img = np.flip(img, 1)
-                elif (not self.flip) and self.transpose:
-                    img = img.T
-                img = img[self.clip_boundary['ver'][0]:self.clip_boundary['ver'][1],
-                        self.clip_boundary['hor'][0]:self.clip_boundary['hor'][1]]
-                #normalized the intensity by the monitor and trams counters
-                self.extract_motor_angles(frame_number)
-                self.extract_pot_current(frame_number)
-                self.extract_HKL(frame_number)
-                return img/self.extract_transm_and_mon(frame_number)
+        Raises:
+            ValueError: if try to use default value that  is set to None
 
-    def load_frame(self,frame_number):
-        #if one frame one nxs file
-        #img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,scan_number)
-        #img_path=os.path.join(self.nexus_path,img_name)
-        #data=nxload(img_path)
-        #img=np.array(data.entry.instrument.detector.data.nxdata[0])
-        if self.img_structure=='one':
-            while frame_number < self.total_frame_number:
-                img=self.nexus_data_1.entry.instrument.detector.data._get_filedata(frame_number)
-                #print(self.nexus_data_1.entry.instrument.detector.data.shape)
-                #print(img)
-                if img is None:
-                    img=self.nexus_data_1.entry.instrument.detector.data._get_filedata(frame_number-1)
-                self.extract_motor_angles(frame_number)
-                self.extract_pot_current(frame_number)
-                self.extract_HKL(frame_number)
-                self.frame_number = frame_number
-                if self.flip and self.transpose:
-                    img = np.flip(img.T,1)
-                elif self.flip and (not self.transpose):
-                    img = np.flip(img, 1)
-                elif (not self.flip) and self.transpose:
-                    img = img.T
-                img = img[self.clip_boundary['ver'][0]:self.clip_boundary['ver'][1],
-                        self.clip_boundary['hor'][0]:self.clip_boundary['hor'][1]]
-                #normalized the intensity by the monitor and trams counters
-                #self.current_img = img/self.motor_angles['mon']/self.motor_angles['transm']
-                yield img/self.motor_angles['mon']/self.motor_angles['transm']
-                # yield img/self.motor_angles['mon']/self.motor_angles['transm']
-                #yield img/self.motor_angles['transm']/200000
-                frame_number +=1
-        elif self.img_structure == 'multiple':
-            while frame_number < self.total_frame_number:
-                img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,self.scan_number)
-                img_name_1='{}_{:0>5}_{:0>5}.nxs'.format(self.frame_prefix,self.scan_number,frame_number)
-                #print(img_name_1,img_name)
-                img_path_1=os.path.join(self.nexus_path,img_name.replace(".nxs",""),'lmbd',img_name_1)
-                self.nexus_data_1 = nxload(img_path_1)
-                img=self.nexus_data_1.entry.instrument.detector.data._get_filedata(0)
-                #print(self.nexus_data_1.entry.instrument.detector.data.shape)
-                #if img is None:
-                #    img=self.nexus_data_1.entry.instrument.detector.data._get_filedata(frame_number-1)
-                self.extract_motor_angles(frame_number)
-                self.extract_pot_current(frame_number)
-                self.extract_HKL(frame_number)
-                self.frame_number = frame_number
-                if self.flip and self.transpose:
-                    img = np.flip(img.T,1)
-                elif self.flip and (not self.transpose):
-                    img = np.flip(img, 1)
-                elif (not self.flip) and self.transpose:
-                    img = img.T
-                img = img[self.clip_boundary['ver'][0]:self.clip_boundary['ver'][1],
-                        self.clip_boundary['hor'][0]:self.clip_boundary['hor'][1]]
-                #normalized the intensity by the monitor and trams counters
-                #self.current_img = img/self.motor_angles['mon']/self.motor_angles['transm']
-                yield img/self.motor_angles['mon']/self.motor_angles['transm']
-                #yield img/self.motor_angles['transm']/200000
-                frame_number +=1
-
-    def extract_beam_mon_ct(self,mon_path = 'scan/data/eh_c01'):
-        return np.array(self.nexus_data['scan/data/eh_c01'])
-
-    def extract_motor_angles(self, frame_number):
-        #img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,scan_number)
-        #img_path=os.path.join(self.nexus_path,img_name)
-        #data=nxload(img_path)
+        Returns:
+            motors: motor values for frame index of frame_number
+        """
         motors={}
-        motor_names = ['phi', 'chi', 'delta', 'gamma', 'mu', 'omega_t','omega']
-        #for motor in self.constant_motors:
-        #    motors[motor] = self.constant_motors[motor]
+        #warning: this motor name list could be different from case to case
+        motor_names = ['phi', 'chi', 'delta', 'gamma', 'mu', 'omega_t', 'omega']
         for motor in motor_names:
-            #if motor not in motors.keys():
+            fetch_path, default_value = self.meta_data_fetch_path_map[motor]
             try:#use those from nexus file if it is presence
-                fetch_path = 'scan/data/{}'.format(motor)
-                motors[motor] = np.array(self.nexus_data[fetch_path])[frame_number]
+                motors[motor] = np.array(self.scan_meta_data[fetch_path])[frame_number]
             except:#if not then use the constant motor angles
-                motors[motor] = self.constant_motors[motor]
-        motors['mon'] = np.array(self.nexus_data['scan/data/eh_c01'])[frame_number]
-        try:
-            motors['transm']=1./np.array(self.nexus_data['scan/data/atten'])[frame_number]
-        except:
-            #motors['transm']=np.array(self.nexus_data['scan/data/lmbd_countsroi1'])[frame_number]/np.array(self.nexus_data['scan/data/lmbd_countsroi1_atten'])[frame_number]
-            motors['transm']= 1
-        try:
-            motors['time'] = np.array(self.nexus_data['scan/data/timestamp'])[frame_number]
-        except:
-            motors['time'] = sum(np.array(self.nexus_data['scan/data/eh_t01'])[0:frame_number])
+                if motor in self.constant_motors:
+                    motors[motor] = self.constant_motors[motor]
+                else:
+                    motors[motor] = default_value
+        variable_names = ['mon', 'atten', 'time']
+        for each in variable_names:
+            fetch_path, default_value = self.meta_data_fetch_path_map[each]
+            try:#use those from nexus file if it is presence
+                value = np.array(self.scan_meta_data[fetch_path])[frame_number]
+                if each == 'atten': # this is also very DIY thing
+                    motors['transm'] = 1./value
+                else:
+                    motors[each] = value
+            except:#if not then use the constant motor angles
+                if default_value != None:
+                    motors[each] = default_value
+                else:
+                    raise ValueError('The dafult value is None. You cannot set a value to none.')          
+        motors['scaling_factor'] = motors['mon'] * motors['transm']
         self.motor_angles = motors
-        #self.motor_angles['transm'] = 1
-        #self.motor_angles['mon'] =1
         return motors
 
-    def extract_transm_and_mon(self,frame_number):
-        mon = np.array(self.nexus_data['scan/data/eh_c01'])[frame_number]
-        try:
-            transm=1./np.array(self.nexus_data['scan/data/atten'])[frame_number]
-        except:
-            #motors['transm']=np.array(self.nexus_data['scan/data/lmbd_countsroi1'])[frame_number]/np.array(self.nexus_data['scan/data/lmbd_countsroi1_atten'])[frame_number]
-            transm= 1
-        return mon*transm
+    def _extract_pot_current(self, frame_number):
+        """extract potential and current value for a data point
 
-    def extract_delta_angles(self):
-        #img_name='{}_{:0>5}.nxs'.format(self.frame_prefix,scan_number)
-        #img_path=os.path.join(self.nexus_path,img_name)
-        #data=nxload(img_path)
-        try:
-            return np.array(self.nexus_data['scan/data/{}'.format('delta')])
-        except:
-            return [self.constant_motors['delta']]
+        Args:
+            frame_number (int): frame index
 
-    def update_motor_angles_in_data(self,data):
-        for motor in self.motor_angles:
-            data[motor].append(self.motor_angles[motor])
-        return data
+        Raises:
+            ValueError: try to use default value that is set to None
 
-    def extract_pot_current(self, frame_number):
-        try:
-            try:
-                pot = np.array(self.nexus_data['scan/data/voltage2'])[frame_number]
-            except:
-                pot = np.array(self.nexus_data['scan/data/pilc_voltage2'])[frame_number]
-        except:
-            print('Potential channel not saved in the nexus file!')
-            pot = np.zeros(self.total_frame_number)[frame_number]
-        try:
-            try:
-                cur = np.array(self.nexus_data['scan/data/voltage1'])[frame_number]
-            except:
-                cur = np.array(self.nexus_data['scan/data/pilc_voltage1'])[frame_number]
-        except:
-            print('Current channel not saved in the nexus file!')
-            cur = np.zeros(self.total_frame_number)[frame_number]
-        self.potential = pot
-        self.current = cur
+        Returns:
+            values (list): [potential, current]
+        """
+        variable_names = ['potential', 'current']
+        values = []
+        for each in variable_names:
+            fetch_path, default_value = self.meta_data_fetch_path_map[each]
+            try:#use those from nexus file if it is presence
+                value = np.array(self.scan_meta_data[fetch_path])[frame_number]
+                setattr(self, each, value)
+                values.append(value)
+            except:#if not then use default value
+                if default_value != None:
+                    value = default_value
+                    setattr(self, each, value)
+                    values.append(value)
+                else:
+                    raise ValueError(f'No default valid value is given for {each}!')
         try:
             self.potential_cal = self.potential_profile_cal[frame_number]
         except:
-            self.potential_cal = pot
+            self.potential_cal = values[variable_names.index('potential')]
             print('Use real potential for the potential_cal')
-        return pot, cur
+        return values
 
-    def extract_pot_profile(self):
-        try:
-            pot_profile = np.array(self.nexus_data['scan/data/voltage2'])
-        except:
-            pot_profile = np.array(self.nexus_data['scan/data/pilc_voltage2'])
+    def _extract_pot_profile(self):
+        """extract potential for the current scan number and smooth the data
 
+        Returns:
+            potential_profile(number array of 1d): potential values
+        """
+        pot_profile = self._extract_meta_channel_data('potential', frame_number=None)
         self.potential_profile = pot_profile
         self.potential_profile_cal = FitEnginePool.fit_pot_profile(list(range(len(pot_profile))),pot_profile, show_fig = False)
         return pot_profile
 
-    def extract_HKL(self, frame_number):
-        try:
-            H = np.array(self.nexus_data['scan/data/diffractometer_h'])[frame_number]
-            K = np.array(self.nexus_data['scan/data/diffractometer_k'])[frame_number]
-            L = np.array(self.nexus_data['scan/data/diffractometer_l'])[frame_number]
-            self.hkl =(H,K,L)
-            #cur = np.array(self.nexus_data['scan/data/voltage1'])[frame_number]
-            return H, K, L
-        except:
-            self.hkl=(0,0,0)
-            return 0,0,0
+    def _extract_HKL(self, frame_number):
+        """extract Miller index h k l for a datapoint
 
-    def load_frame_from_path(self,img_path,frame_number = 0,flip=True):
-        try:
-            #if one frame one nxs file
-            data=nxload(img_path)
-            img=np.array(data.entry.instrument.detector.data.nxdata[0])
-        except:
-            #if all frames in one nxs file
-            data=nxload(img_path)
-            img=np.array(data.entry.instrument.detector.data[frame_number])
-        if self.flip and self.transpose:
-            return np.flip(img.T,1)
-        elif self.flip and (not self.transpose):
-            return np.flip(img, 1)
-        elif (not self.flip) and self.transpose:
-            return img.T
-        else:
-            return img
+        Args:
+            frame_number (int): image index
 
-    def show_frame(self,scan_number,frame_number,one_frame_in_one_nxs=True):
-        img=self.load_frame(scan_number,frame_number,one_frame_in_one_nxs,flip)
-        fig,ax=pyplot.subplots()
-        pyplot.imshow(img,cmap='jet')
-        if self.flip:
-            pyplot.colorbar(extend='both',orientation='vertical')
-        else:
-            pyplot.colorbar(extend='both',orientation='horizontal')
-        pyplot.clim(0,205)
-        # pyplot.show()
-        return img
-
-    def find_dead_pix(self,scan_number=666,img_end=100):
-        dead_pix_container=self.load_frame(scan_number,0)==self.load_frame(scan_number,1)
-        dead_pix_container=np.where(dead_pix_container==True)
-        dead_pix_container=zip(tuple(dead_pix_container[0]),tuple(dead_pix_container[1]))
-        img0= self.load_frame(scan_number,0)
-        print(len(dead_pix_container))
-        for i in range(2,img_end):
-            print('Processing img_',i)
-            img = self.load_frame(scan_number,i)
-            temp= img != img0
-            temp= np.where(temp==True)
-            temp= zip(tuple(temp[0]),tuple(temp[1]))
-            for each in temp:
-                if each in dead_pix_container:
-                    dead_pix_container.remove(each)
-        return dead_pix_container
+        Returns:
+            (H, K, L): a tuple of hkl
+        """
+        H = self._extract_meta_channel_data('H', frame_number)
+        K = self._extract_meta_channel_data('K', frame_number)
+        L = self._extract_meta_channel_data('L', frame_number)
+        self.hkl = (H, K, L)
+        return H, K, L
 
 class gsecars_image_loader(object):
     def __init__(self,clip_boundary,kwarg,scan_numbers):
@@ -2231,4 +2270,19 @@ class edf_image_loader_old:
         for i in range(frame_no):
             frames[i] = self.load_frame(scan_no, i, gz_compressed, normalize, monitor_name, remove_rows, remove_cols)
         return frame
+
+
+def test_nexus_img_loader():
+     bd = {'hor': [0,100], 'ver': [0,200]}
+     kwarg_loader = {'frame_prefix':'i20180835','nexus_path':"D:\\xrv_data\\P23_I20180835_Jun_2019",'constant_motors':{'omega_t': 0.34, 'omega': 0, 'phi': 0, 'chi': 0}}
+     loader = nexus_image_loader(bd, kwarg_loader)
+     loader.scan_number = 201
+     #print(f'Total frame number for scan 201 is {loader.get_total_frame_number()}')
+     #extract data
+     loader.update_scan_info(201)
+     imgs = loader.load_frame(0)
+     first_img = next(imgs)
+     print('first img is loaded', 'shape='+str(first_img.shape), first_img)
+     print('To load further images, use next(return_var)')
+     return imgs, loader
 

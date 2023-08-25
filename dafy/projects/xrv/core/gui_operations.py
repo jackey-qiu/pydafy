@@ -52,7 +52,7 @@ class GuiOperations(object):
         #left,right = [int(each) for each in self.region_abnormal.getRegion()]
         #self.lineEdit_abnormal_points.setText('Frame {} to Frame {}'.format(left,right))
         first_index_for_current_scan = np.where(np.array(self.app_ctr.data['scan_no'])==self.app_ctr.img_loader.scan_number)[0][0]
-        index = int(first_index_for_current_scan + self.app_ctr.img_loader.frame_number)
+        index = int(first_index_for_current_scan + self.app_ctr.img_loader.current_frame_number)
         self.app_ctr.data['mask_cv_xrd'][index] = False
         self.app_ctr.data['mask_ctr'][index] = False
         self.updatePlot()
@@ -229,7 +229,7 @@ class GuiOperations(object):
         size_of_roi = self.roi.size()
         self.roi.setPos([self.app_ctr.peak_fitting_instance.peak_center[1]-size_of_roi[0]/2.,self.app_ctr.peak_fitting_instance.peak_center[0]-size_of_roi[1]/2.])
 
-        if self.app_ctr.img_loader.frame_number == 0:
+        if self.app_ctr.img_loader.current_frame_number == 0:
             self.p1.autoRange() 
             #relabel the axis
             if self.radioButton_q.isChecked():
@@ -260,8 +260,8 @@ class GuiOperations(object):
 
             if return_value:
                 self.statusbar.clearMessage()
-                self.statusbar.showMessage('Working on scan{}: we are now at frame{} of {} frames in total!'.format(self.app_ctr.img_loader.scan_number,self.app_ctr.img_loader.frame_number+1,self.app_ctr.img_loader.total_frame_number))
-                self.progressBar.setValue(int((self.app_ctr.img_loader.frame_number+1)/float(self.app_ctr.img_loader.total_frame_number)*100))
+                self.statusbar.showMessage('Working on scan{}: we are now at frame{} of {} frames in total!'.format(self.app_ctr.img_loader.scan_number,self.app_ctr.img_loader.current_frame_number+1,self.app_ctr.img_loader.total_frame_number))
+                self.progressBar.setValue(int((self.app_ctr.img_loader.current_frame_number+1)/float(self.app_ctr.img_loader.total_frame_number)*100))
             else:
                 self.timer.stop()
                 self.save_data()

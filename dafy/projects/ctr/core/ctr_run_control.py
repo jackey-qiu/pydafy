@@ -47,7 +47,7 @@ class RunApp(object):
         self.kwarg_mask = extract_vars_from_config(self.conf_file,section_var = 'Mask')
 
         #recal clip_boundary and cen
-        self.clip_boundary = {"ver":[self.cen[0]-self.clip_width['ver'],self.cen[0]+self.clip_width['ver']+1],
+        self.crop_boundary = {"ver":[self.cen[0]-self.clip_width['ver'],self.cen[0]+self.clip_width['ver']+1],
                         "hor":[self.cen[1]-self.clip_width['hor'],self.cen[1]+self.clip_width['hor']+1]}     
         self.cen_clip = [self.clip_width['ver'],self.clip_width['hor']]
 
@@ -67,7 +67,7 @@ class RunApp(object):
         self.bkg_sub = background_subtraction_single_img(self.cen_clip, self.conf_file, sections = ['Background_Subtraction'])
         self.bkg_sub.update_col_row_width(clip_lib = self.kwarg_global['clip_width'], default_padding_rate = 0.8)
         if self.beamline == 'PETRA3_P23':
-            self.img_loader = nexus_image_loader(clip_boundary = self.clip_boundary, kwarg = self.kwarg_image)
+            self.img_loader = nexus_image_loader(crop_boundary = self.crop_boundary, kwarg = self.kwarg_image)
         elif self.beamline == 'APS_13IDC':
             self.img_loader = gsecars_image_loader(clip_boundary = self.clip_boundary, kwarg = self.kwarg_image, scan_numbers= self.scan_nos)
         self.create_mask_new = create_mask(kwarg = self.kwarg_mask)

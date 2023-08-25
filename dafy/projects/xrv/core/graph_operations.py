@@ -184,7 +184,7 @@ def setup_image(self):
         self.iso.setData(pg.gaussianFilter(self.app_ctr.bkg_sub.img[y:(y+h),x:(x+w)], (2, 2)))
         self.iso.setPos(x,y)
 
-        if self.app_ctr.img_loader.frame_number ==0:
+        if self.app_ctr.img_loader.current_frame_number ==0:
             isoLine.setValue(self.app_ctr.bkg_sub.img[y:(y+h),x:(x+w)].mean())
         else:
             pass
@@ -213,7 +213,7 @@ def setup_image(self):
         self.lineEdit_previous_center.setText(str(self.app_ctr.peak_fitting_instance.previous_peak_center))
         self.lcdNumber_iso.display(isoLine.value())
         self.lcdNumber_scan_number.display(self.app_ctr.img_loader.scan_number)
-        self.lcdNumber_frame_number.display(self.app_ctr.img_loader.frame_number+1)
+        self.lcdNumber_frame_number.display(self.app_ctr.img_loader.current_frame_number+1)
 
     roi.sigRegionChanged.connect(updatePlot)
     roi_bkg.sigRegionChanged.connect(updatePlot)
