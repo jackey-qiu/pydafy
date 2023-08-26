@@ -1,5 +1,6 @@
 import numpy as np
 import xrayutilities as xu
+import xrayutilities as xu
 from dafy.core.util.Reciprocal_space_tools.HKLVlieg import Crystal, printPos, UBCalculator, VliegAngles, printPos_prim, vliegDiffracAngles
 from nexusformat.nexus import *
 from PyQt5 import QtCore
@@ -43,6 +44,7 @@ import matplotlib.collections as mcoll
 import matplotlib.path as mpath
 from PyQt5.QtWidgets import QMessageBox
 from functools import wraps
+import glob
 
 class DocInherit(object):
     """
@@ -527,6 +529,20 @@ def image_generator_bkg_gsecars(scans,img_loader,mask_creator):
                 pass
             yield mask_creator.create_mask_new(img = image, img_q_ver = img_index_ver,
                                   img_q_par = img_index_hor, mon = img_loader.motor_angles['norm']*img_loader.motor_angles['transmission'])
+            current_image_no +=1
+
+def image_generator_bkg_spec(scans,img_loader,mask_creator):
+    for scan in scans:
+        img_loader.update_scan_info(scan)
+        current_image_no = 0
+        img_index_ver, img_index_hor = None, None
+        for image in img_loader.load_frame(frame_number=0):
+            if current_image_no==0:
+                img_index_hor, img_index_ver = np.meshgrid(range(image.shape[1]),range(image.shape[0]))
+            else:
+                pass
+            yield mask_creator.create_mask_new(img = image, img_q_ver = img_index_ver,
+                                  img_q_par = img_index_hor, mon = img_loader.motor_angles['scaling_factor'])
             current_image_no +=1
 
 def extract_vars_from_config(config_file, section_var):
@@ -1509,6 +1525,72 @@ class nexus_image_loader(imageLoaderBase):
         self.hkl = (H, K, L)
         return H, K, L
 
+class spec_image_loader(imageLoaderBase):
+    img_data_name_format = "{}_S{:0>3}_{:0>5}.tif"
+    motor_name_map = {'del': 'TwoTheta', 
+                      'eta': 'theta', 
+                      'chi': 'chi', 
+                      'phi': 'phi', 
+                      'nu': 'Nu', 
+                      'mu': 'Psi',
+                      'norm':'io',
+                      'transmission':'transm', 
+                      'E':'Energy'}
+
+    def __init__(self, crop_boundary, kwarg):
+        super().__init__(crop_boundary, kwarg)
+        self.spec = xu.io.SPECFile(self.spec_name, path = self.spec_path)
+
+    def validate_kwarg(self, kwarg):
+        assert 'spec_path' in kwarg, "spec_path is needed in the kwarg."
+        assert 'spec_name' in kwarg, "spec_file_name is needed in the kwarg."
+
+    @DocInherit
+    def _extract_img_data(self, scan_number):
+        folder = os.path.join(self.spec_path, 'images', self.spec_name.rsplit('.')[0], 'S{:0>3}'.format(scan_number))
+        self.scan_img_data = sorted(glob.glob(os.path.join(folder, '*.tif')))
+
+    @DocInherit
+    def _extract_meta_data(self, scan_number):
+        self.scan_meta_data = getattr(self.spec, f'scan{scan_number}')
+        self.scan_meta_data.ReadData()
+        
+    @DocInherit
+    def _extract_one_img(self, frame_number):
+        img_path = self.scan_img_data[frame_number]
+        return misc.imread(img_path)
+
+    @DocInherit
+    def _extract_meta_data_for_one_img(self, frame_number):
+        motors = {}
+        #motor angles
+        for key, value in self.motor_name_map.items():
+            if hasattr(self.scan_meta_data.data, key):
+                motors[key] = getattr(self.scan_meta_data.data, key)[frame_number]
+            elif hasattr(self.scan_meta_data.data, value):
+                motors[key] = getattr(self.scan_meta_data.data, value)[frame_number]
+            else:
+                if key == 'E':#get energy from header
+                    motors[key] = round(1239.8/float(self.scan_meta_data.getheader_element('G4').rsplit(' ')[3]),4)
+        motors['scaling_factor'] = motors['norm'] * motors['transmission']
+        self.motor_angles = motors
+        #hkl
+        self.hkl = [self.scan_meta_data.data.H[frame_number], self.scan_meta_data.data.K[frame_number], self.scan_meta_data.data.L[frame_number]]
+    
+    @DocInherit
+    def _prepare_preprocessing_pipline_parameters(self):
+        return   {
+                   'crop': {'crop_boundary': self.crop_boundary},
+                   'normalize': {'factor': self.motor_angles['scaling_factor']}
+                  }
+
+    @DocInherit
+    def _get_total_frame_number(self, scan_number = None):
+        if scan_number == None:
+            scan_number = self.scan_number
+        self._extract_meta_data(scan_number)
+        return len(self.scan_meta_data.data)
+
 class gsecars_image_loader(object):
     def __init__(self,clip_boundary,kwarg,scan_numbers):
         # self.nexus_path=nexus_path
@@ -2286,3 +2368,16 @@ def test_nexus_img_loader():
      print('To load further images, use next(return_var)')
      return imgs, loader
 
+def test_spec_img_loader():
+     bd = {'hor': [0,500], 'ver': [0,500]}
+     kwarg_loader = {'spec_path':"D:\\beamtime_data\\Dec_2017_APS",'spec_file_name':"s4_zr_10mM_RbCl_1.spec"}
+     loader = spec_image_loader(bd, kwarg_loader)
+     #loader.scan_number = 95
+     #print(f'Total frame number for scan 201 is {loader.get_total_frame_number()}')
+     #extract data
+     loader.update_scan_info(95)
+     imgs = loader.load_frame(0)
+     first_img = next(imgs)
+     print('first img is loaded', 'shape='+str(first_img.shape), first_img)
+     print('To load further images, use next(return_var)')
+     return imgs, loader

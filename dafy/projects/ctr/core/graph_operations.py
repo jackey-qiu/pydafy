@@ -157,7 +157,7 @@ def setup_image(self):
         self.display_current_roi_info()
         # t2 = time.time()
         # print(t1-t0,t2-t1)
-        if self.app_ctr.img_loader.frame_number ==0:
+        if self.app_ctr.img_loader.current_frame_number ==0:
             isoLine.setValue(self.app_ctr.bkg_sub.img[y:(y+h),x:(x+w)].mean())
         else:
             pass
@@ -167,7 +167,7 @@ def setup_image(self):
         if self.tag_reprocess:
             index_frame = int(self.lineEdit_frame_index_offset.text())
             plot_bkg_fit_gui_pyqtgraph(self.p2, self.p3, self.p4,self.app_ctr,index_frame)
-            self.lcdNumber_frame_number.display(self.app_ctr.img_loader.frame_number+1+index_frame+1)
+            self.lcdNumber_frame_number.display(self.app_ctr.img_loader.current_frame_number+1+index_frame+1)
             try:
                 self.lcdNumber_potential.display(self.app_ctr.data['potential'][index_frame])
                 self.lcdNumber_current.display(self.app_ctr.data['current'][index_frame])
@@ -204,7 +204,7 @@ def setup_image(self):
         w, h = [int(each) for each in self.roi.size()]
         self.iso.setData(pg.gaussianFilter(self.app_ctr.bkg_sub.img[y:(y+h),x:(x+w)], (2, 2)))
         self.iso.setPos(x,y)
-        if self.app_ctr.img_loader.frame_number ==0:
+        if self.app_ctr.img_loader.current_frame_number ==0:
             isoLine.setValue(self.app_ctr.bkg_sub.img[y:(y+h),x:(x+w)].mean())
         else:
             pass

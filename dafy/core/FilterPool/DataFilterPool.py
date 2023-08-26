@@ -134,7 +134,7 @@ def cal_ctot_stationary(incidence_ang, det_ang_ver, det_ang_hor):
 
 def merge_data_image_loader_gsecars(data, object_image_loader):
     key_map_rules = {'scan_no':object_image_loader.scan_number,
-                     'image_no':object_image_loader.frame_number,
+                     'image_no':object_image_loader.current_frame_number,
                      'H':int(round(object_image_loader.hkl[0],0)),
                      'K':int(round(object_image_loader.hkl[1],0)),
                      'L':object_image_loader.hkl[2],

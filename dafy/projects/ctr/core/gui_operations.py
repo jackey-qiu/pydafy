@@ -58,7 +58,7 @@ class GuiOperations(object):
 
         self.statusbar.clearMessage()
         self.statusbar.showMessage('Working on scan{}: we are now at frame{} of {} frames in total!'.format(self.app_ctr.img_loader.scan_number,frame_number+1,self.app_ctr.img_loader.total_frame_number))
-        self.progressBar.setValue((self.app_ctr.img_loader.frame_number+1)/float(self.app_ctr.img_loader.total_frame_number)*100)
+        self.progressBar.setValue((self.app_ctr.img_loader.current_frame_number+1)/float(self.app_ctr.img_loader.total_frame_number)*100)
         # self.lcdNumber_frame_number.display(self.app_ctr.img_loader.frame_number+1)
         try:
             self.lcdNumber_speed.display(int(1./(time.time()-t0)))
@@ -389,7 +389,7 @@ class GuiOperations(object):
         isocurve_center_x, iso_curve_center_y = self.iso.boundingRect().center().x(), self.iso.boundingRect().center().y()
         isocurve_height, isocurve_width = self.iso.boundingRect().height()+arbitrary_size_offset,self.iso.boundingRect().width()+arbitrary_size_offset
         roi_new = [self.roi.pos()[0] + isocurve_center_x - self.roi.size()[0]/2,self.roi.pos()[1]+(iso_curve_center_y-self.roi.size()[1]/2)+self.roi.size()[1]/2-isocurve_height/2]
-        if abs(sum(roi_new) - sum(self.roi_pos))<arbitrary_recenter_cutoff or (self.app_ctr.img_loader.frame_number == 0):
+        if abs(sum(roi_new) - sum(self.roi_pos))<arbitrary_recenter_cutoff or (self.app_ctr.img_loader.current_frame_number == 0):
             self.roi.setPos(pos = roi_new)
             self.roi.setSize(size = [self.roi.size()[0],isocurve_height])
         else:#if too far away, probably the peak tracking failed to track the right peak. Then reset the roi to what it is before the track!
@@ -557,9 +557,9 @@ class GuiOperations(object):
                     self.set_peak()
                 if return_value:
                     self.statusbar.clearMessage()
-                    self.statusbar.showMessage('Working on scan{}: we are now at frame{} of {} frames in total!'.format(self.app_ctr.img_loader.scan_number,self.app_ctr.img_loader.frame_number+1,self.app_ctr.img_loader.total_frame_number))
-                    self.progressBar.setValue(int((self.app_ctr.img_loader.frame_number+1)/self.app_ctr.img_loader.total_frame_number*100))
-                    self.lcdNumber_frame_number.display(self.app_ctr.img_loader.frame_number+1)
+                    self.statusbar.showMessage('Working on scan{}: we are now at frame{} of {} frames in total!'.format(self.app_ctr.img_loader.scan_number,self.app_ctr.img_loader.current_frame_number+1,self.app_ctr.img_loader.total_frame_number))
+                    self.progressBar.setValue(int((self.app_ctr.img_loader.current_frame_number+1)/self.app_ctr.img_loader.total_frame_number*100))
+                    self.lcdNumber_frame_number.display(self.app_ctr.img_loader.current_frame_number+1)
                 else:
                     self.timer.stop()
                     self.save_data()

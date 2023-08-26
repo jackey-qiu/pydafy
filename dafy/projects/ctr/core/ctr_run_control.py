@@ -6,7 +6,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 from dafy.core.FilterPool.DataFilterPool import create_mask, merge_data_bkg, update_data_bkg, update_data_bkg_previous_frame, merge_data_image_loader, merge_data_image_loader_gsecars,make_data_config_file, cal_ctot_stationary
 from dafy.core.EnginePool.FitEnginePool import background_subtraction_single_img
-from dafy.core.util.UtilityFunctions import scan_generator,image_generator_bkg, image_generator_bkg_gsecars,nexus_image_loader, gsecars_image_loader,extract_vars_from_config
+from dafy.core.util.UtilityFunctions import scan_generator,image_generator_bkg, image_generator_bkg_gsecars, image_generator_bkg_spec,nexus_image_loader, spec_image_loader, gsecars_image_loader,extract_vars_from_config
 
 #make compatibility of py 2 and py 3#
 if (sys.version_info > (3, 0)):
@@ -69,7 +69,7 @@ class RunApp(object):
         if self.beamline == 'PETRA3_P23':
             self.img_loader = nexus_image_loader(crop_boundary = self.crop_boundary, kwarg = self.kwarg_image)
         elif self.beamline == 'APS_13IDC':
-            self.img_loader = gsecars_image_loader(clip_boundary = self.clip_boundary, kwarg = self.kwarg_image, scan_numbers= self.scan_nos)
+            self.img_loader = spec_image_loader(crop_boundary = self.crop_boundary, kwarg = self.kwarg_image)
         self.create_mask_new = create_mask(kwarg = self.kwarg_mask)
         self.setup_frames()
 
@@ -79,7 +79,7 @@ class RunApp(object):
         if self.beamline == 'PETRA3_P23':
             self._images = image_generator_bkg(self._scans,self.img_loader,self.create_mask_new)
         elif self.beamline == 'APS_13IDC':
-            self._images = image_generator_bkg_gsecars(self._scans,self.img_loader,self.create_mask_new)
+            self._images = image_generator_bkg_spec(self._scans,self.img_loader,self.create_mask_new)
 
     def run_script(self,bkg_intensity = 0,poly_func = 'Vincent'):
         try:
@@ -92,7 +92,7 @@ class RunApp(object):
                     self.current_scan_number = self.img_loader.scan_number
             else:
                 setattr(self,'current_scan_number',self.img_loader.scan_number)
-            self.current_frame = self.img_loader.frame_number
+            self.current_frame = self.img_loader.current_frame_number
             self.img = img
             if self.beamline == 'PETRA3_P23':
                 self.data = merge_data_image_loader(self.data, self.img_loader)
