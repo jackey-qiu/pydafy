@@ -37,13 +37,25 @@ class RunApp(object):
         self.kwarg_mask = extract_vars_from_config(self.conf_file,section_var = 'Mask')
 
         #recal crop_boundary and cen
+        max_clip_width_ver = min([self.cen[0], self.kwarg_global['dim_detector'][0]-self.cen[0]])
+        max_clip_width_hor = min([self.cen[1], self.kwarg_global['dim_detector'][1]-self.cen[1]])
+        if self.clip_width['ver']>max_clip_width_ver:
+            self.clip_width['ver'] = max_clip_width_ver
+        if self.clip_width['hor']>max_clip_width_hor:
+            self.clip_width['hor'] = max_clip_width_hor
+
+        self.crop_boundary = {"ver":[self.cen[0]-self.clip_width['ver'],self.cen[0]+self.clip_width['ver']+1],
+                              "hor":[self.cen[1]-self.clip_width['hor'],self.cen[1]+self.clip_width['hor']+1]}     
+        self.cen_clip = [int((self.crop_boundary['ver'][1] - self.crop_boundary['ver'][0])/2),
+                         int((self.crop_boundary['hor'][1] - self.crop_boundary['hor'][0])/2)]
+        '''
         self.crop_boundary = {"ver":[max([self.cen[0]-self.clip_width['ver'],0]),min([self.cen[0]+self.clip_width['ver']+1,self.kwarg_global['dim_detector'][0]])],
                         "hor":[max([self.cen[1]-self.clip_width['hor'],0]),min([self.cen[1]+self.clip_width['hor']+1,self.kwarg_global['dim_detector'][1]])]}
         self.cen_clip = [int(abs(self.crop_boundary['ver'][1]-self.crop_boundary['ver'][0])/2), int(abs(self.crop_boundary['hor'][1]-self.crop_boundary['hor'][0])/2)]       
         offset = [self.cen_clip[0] - self.clip_width['ver'], self.cen_clip[1] - self.clip_width['hor']]
         #apply offset now
         self.cen_clip = [self.cen_clip[0] - abs(offset[0]),self.cen_clip[1] - abs(offset[1])]
-
+        '''
         #data file
         for key in self.data_keys:
             self.data[key]=[]

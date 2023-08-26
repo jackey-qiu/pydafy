@@ -1,6 +1,15 @@
 import pyqtgraph as pg
 from dafy.core.EnginePool.VisualizationEnginePool import plot_bkg_fit_gui_pyqtgraph
 
+def update_roi(self):
+    ver_width,hor_width = self.app_ctr.cen_clip
+    self.roi.setSize([hor_width*2*0.6, ver_width*2])
+    self.roi.setPos([hor_width*2*0.2, 0.])
+    self.roi_peak.setSize([self.app_ctr.bkg_sub.peak_width*2, ver_width*2])
+    self.roi_peak.setPos([hor_width-self.app_ctr.bkg_sub.peak_width, 0.])
+    self.roi_bkg.setSize([hor_width*2*0.1, ver_width*2])
+    self.roi_bkg.setPos([hor_width*2*0.2, 0.])
+
 def setup_image(self):
     # Interpret image data as row-major instead of col-major
     global img, roi, roi_bkg, data, p2, isoLine, iso

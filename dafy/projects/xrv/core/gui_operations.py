@@ -4,7 +4,7 @@ from PyQt5 import QtCore
 from PyQt5.QtWidgets import QFileDialog, QCheckBox, QRadioButton
 from dafy.core.util.path import DaFy_path
 from dafy.projects.xrv.core.util import pixel_to_q
-from .graph_operations import setup_image
+from .graph_operations import setup_image, update_roi
 
 class GuiOperations(object):
     def __init__(self):
@@ -84,6 +84,9 @@ class GuiOperations(object):
 
     def setup_image(self):
         setup_image(self)
+
+    def update_roi(self):
+        update_roi(self)
 
     def _update_info(self,index):
         self.lcdNumber_potential.display(self.app_ctr.data['potential'][index])
@@ -173,7 +176,7 @@ class GuiOperations(object):
             self.widget_image.resize(size.width(),size.height())
             self.timer_save_data.start(self.spinBox_save_frequency.value()*1000*60)
         else:
-            pass
+            self.update_roi()
             self.timer_save_data.stop()
             self.timer_save_data.start(self.spinBox_save_frequency.value()*1000*60)
         #self.timer_save_data.stop()

@@ -1526,7 +1526,6 @@ class nexus_image_loader(imageLoaderBase):
         return H, K, L
 
 class spec_image_loader(imageLoaderBase):
-    img_data_name_format = "{}_S{:0>3}_{:0>5}.tif"
     motor_name_map = {'del': 'TwoTheta', 
                       'eta': 'theta', 
                       'chi': 'chi', 
@@ -1541,9 +1540,10 @@ class spec_image_loader(imageLoaderBase):
         super().__init__(crop_boundary, kwarg)
         self.spec = xu.io.SPECFile(self.spec_name, path = self.spec_path)
 
+    @DocInherit
     def validate_kwarg(self, kwarg):
         assert 'spec_path' in kwarg, "spec_path is needed in the kwarg."
-        assert 'spec_name' in kwarg, "spec_file_name is needed in the kwarg."
+        assert 'spec_name' in kwarg, "spec_name is needed in the kwarg."
 
     @DocInherit
     def _extract_img_data(self, scan_number):
@@ -1580,6 +1580,7 @@ class spec_image_loader(imageLoaderBase):
     @DocInherit
     def _prepare_preprocessing_pipline_parameters(self):
         return   {
+                   'transpose': {},
                    'crop': {'crop_boundary': self.crop_boundary},
                    'normalize': {'factor': self.motor_angles['scaling_factor']}
                   }

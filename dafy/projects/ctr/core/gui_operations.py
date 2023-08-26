@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QCheckBox, QRadioButton, QFileDialog
 from dafy.core.util.PlotSetup import overplot_ctr_temp
 from dafy.projects.ctr.widgets.custom_widget import DataEditorDialog
 from dafy.core.EnginePool.VisualizationEnginePool import plot_bkg_fit_gui_pyqtgraph
-from dafy.projects.ctr.core.graph_operations import setup_image
+from dafy.projects.ctr.core.graph_operations import setup_image, update_roi
 
 
 class GuiOperations(object):
@@ -15,6 +15,9 @@ class GuiOperations(object):
 
     def setup_image(self):
         setup_image(self)
+
+    def update_roi(self):
+        update_roi(self)
 
     def start_dL_BL_editor_dialog(self):
         dlg = DataEditorDialog(self)
@@ -453,7 +456,7 @@ class GuiOperations(object):
             if self.launch.text()=='Launch':
                 self.setup_image()
             else:
-                pass
+                self.update_roi()
             self.timer_save_data.stop()
             self.timer_save_data.start(self.spinBox_save_frequency.value()*1000*60)
             self.plot_()

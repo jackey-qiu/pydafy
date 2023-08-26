@@ -1,6 +1,13 @@
 import pyqtgraph as pg
 from dafy.core.EnginePool.VisualizationEnginePool import plot_xrv_gui_pyqtgraph
 
+def update_roi(self):
+    ver_width,hor_width = self.app_ctr.cen_clip
+    self.roi.setSize([hor_width*2*0.9, ver_width*2])
+    self.roi.setPos([hor_width*2*0.2, 0.])
+    self.roi_bkg.setSize([hor_width*2*0.09, ver_width*2])
+    self.roi_bkg.setPos([hor_width*2*0.2, 0.])
+
 def setup_image(self):
     win = self.widget_image
 
@@ -18,14 +25,17 @@ def setup_image(self):
     self.hist.setImageItem(img)
     
     # Custom ROI for selecting an image region
-    roi = pg.ROI([100, 100], [200, 200])
+    ver_width,hor_width = self.app_ctr.cen_clip
+    roi = pg.ROI(pos = [hor_width*2*0.2, 0.], size = [hor_width*2*0.9, ver_width*2])
+    # roi = pg.ROI([100, 100], [200, 200])
     self.roi = roi
     roi.addScaleHandle([0.5, 1], [0.5, 0.5])
-    roi.addScaleHandle([0, 0.5], [0.5, 0.5])
+    roi.addScaleHandle([1, 0.5], [0.5, 0.5])
     p1.addItem(roi)
 
     # Custom ROI for monitoring bkg
-    roi_bkg = pg.ROI([0, 100], [200, 200],pen = 'r')
+    roi_bkg = pg.ROI(pos = [hor_width*2*0.2, 0.], size = [hor_width*2*0.09, ver_width*2],pen = 'r')
+    # roi_bkg = pg.ROI([0, 100], [200, 200],pen = 'r')
     self.roi_bkg = roi_bkg
     roi_bkg.addScaleHandle([0.5, 1], [0.5, 0.5])
     roi_bkg.addScaleHandle([0, 0.5], [0.5, 0.5])
@@ -201,6 +211,12 @@ def setup_image(self):
         self.p2.addItem(self.vLine_par, ignoreBounds = True)
         self.p2.addItem(self.hLine_par, ignoreBounds = True)
 
+        #update roi
+        x, y = [int(each) for each in self.roi.pos()]
+        w, h = [int(each) for each in self.roi.size()]
+        self.roi_bkg.setSize([w*0.1,h])
+        self.roi_bkg.setPos([x,y])
+
         #show values for current status
         self.lcdNumber_potential.display(self.app_ctr.data['potential'][-1])
         self.lcdNumber_current.display(self.app_ctr.data['current'][-1])
@@ -216,7 +232,7 @@ def setup_image(self):
         self.lcdNumber_frame_number.display(self.app_ctr.img_loader.current_frame_number+1)
 
     roi.sigRegionChanged.connect(updatePlot)
-    roi_bkg.sigRegionChanged.connect(updatePlot)
+    #roi_bkg.sigRegionChanged.connect(updatePlot)
     self.updatePlot = updatePlot
 
     def updateIsocurve():
