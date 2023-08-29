@@ -9,6 +9,7 @@ def update_roi(self):
     self.roi_bkg.setPos([hor_width*2*0.2, 0.])
 
 def setup_image(self):
+    global isoLine, iso
     win = self.widget_image
 
     # Contrast/color control
@@ -45,7 +46,13 @@ def setup_image(self):
     iso = pg.IsocurveItem(level=0.8, pen='g')
     iso.setParentItem(img)
     self.iso = iso
-    
+
+    # Contrast/color control
+    # hist = pg.HistogramLUTItem()
+    # self.hist = hist
+    # hist.setImageItem(img)
+    # win.addItem(hist)
+
     # Draggable line for setting isocurve level
     isoLine = pg.InfiniteLine(angle=0, movable=True, pen='g')
     self.isoLine = isoLine
@@ -193,6 +200,14 @@ def setup_image(self):
         w, h = [int(each) for each in self.roi.size()]
         self.iso.setData(pg.gaussianFilter(self.app_ctr.bkg_sub.img[y:(y+h),x:(x+w)], (2, 2)))
         self.iso.setPos(x,y)
+        ##update hist, to make it fixed to manually set values
+        if self.lineEdit_levels.text().rstrip()!="[NaN,NaN]":
+            try:
+                levels = eval(self.lineEdit_levels.text().rstrip())
+                self.hist.setLevels(*levels)
+            except:
+                print('The given level values is not valid')
+            #self.hist.setLevels(*eval(self.lineEdit_levels.text().rstrip()))
 
         if self.app_ctr.img_loader.current_frame_number ==0:
             isoLine.setValue(self.app_ctr.bkg_sub.img[y:(y+h),x:(x+w)].mean())
@@ -236,8 +251,8 @@ def setup_image(self):
     self.updatePlot = updatePlot
 
     def updateIsocurve():
-        # global isoLine, iso
-        self.iso.setLevel(isoLine.value())
+        global isoLine, iso
+        iso.setLevel(isoLine.value())
         self.lcdNumber_iso.display(isoLine.value())
     self.updateIsocurve = updateIsocurve
     isoLine.sigDragged.connect(updateIsocurve)

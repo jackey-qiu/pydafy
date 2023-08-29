@@ -45,6 +45,8 @@ class MyMainWindow(QMainWindow, GuiOperations):
         setattr(self.app_ctr,'data_path',os.path.join(self.lineEdit_data_file_path.text(),self.lineEdit_data_file_name.text()))
 
         #signal-slot setting
+        self.pushButton_use_current_levels.clicked.connect(self.fix_current_hist_values)
+        self.pushButton_auto_level.clicked.connect(lambda:self.lineEdit_levels.setText('[NaN,NaN]'))
         self.open.clicked.connect(self.load_file)
         self.launch.clicked.connect(self.launch_file)
         self.stopBtn.clicked.connect(self.stop_func)

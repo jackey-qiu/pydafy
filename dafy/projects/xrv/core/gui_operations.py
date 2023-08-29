@@ -10,6 +10,9 @@ class GuiOperations(object):
     def __init__(self):
         pass
 
+    def fix_current_hist_values(self):
+        self.lineEdit_levels.setText(str(list(self.hist.getLevels())))
+
     def apply_cut_width_offset(self):
         self.app_ctr.peak_fitting_instance.set_cut_width_offset({'hor':self.spinBox_cut_width_offset_hor.value(),'ver':self.spinBox_cut_width_offset_ver.value()})
         self.recenter()
@@ -249,7 +252,8 @@ class GuiOperations(object):
             ax_item_img_ver = pixel_to_q(scale = scale_ver, shift = shift_ver, orientation = 'left')
             ax_item_img_hor.attachToPlotItem(self.p1)
             ax_item_img_ver.attachToPlotItem(self.p1)
-        self.hist.setLevels(self.app_ctr.bkg_sub.img.min(), self.app_ctr.bkg_sub.img.mean()*10)
+        # self.hist.setLevels(self.app_ctr.bkg_sub.img.min(), self.app_ctr.bkg_sub.img.mean()*10)
+        # self.hist.setLevels(*self.hist.getLevels())
 
     def plot_(self):
         t0 = time.time()
