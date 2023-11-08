@@ -1410,18 +1410,20 @@ class nexus_image_loader(imageLoaderBase):
     def _extract_meta_channel_data(self, channel_name, frame_number = None):
         if channel_name not in self.meta_data_fetch_path_map:
             raise ValueError(f'The {channel_name} is not exising in the meta_data_fetch_path_map!')
-        fetch_path, _ = self.meta_data_fetch_path_map[channel_name]
+        fetch_path, default_value = self.meta_data_fetch_path_map[channel_name]
         try:
-            _ = self.scan_meta_data[fetch_path]
+            temp_meta_data = self.scan_meta_data[fetch_path]
         except:
-            raise Exception('Could not extract the required data from nx file')
+            #raise Exception('Could not extract the required data from nx file')
+            print(f'Could not extract the required data for {channel_name} from nx file, use default value instead')
+            temp_meta_data = [default_value]*self.total_frame_number
         if frame_number != None:
             if type(frame_number)==int:
-                return np.array(self.scan_meta_data[fetch_path])[frame_number]
+                return np.array(temp_meta_data)[frame_number]
             else:
                 raise ValueError(f'frame_number has to be integer, but you have {frame_number}')
         else:
-            return np.array(self.scan_meta_data[fetch_path])
+            return np.array(temp_meta_data)
 
     def _extract_motor_angles(self, frame_number):
         """extract motor angles
@@ -1505,9 +1507,14 @@ class nexus_image_loader(imageLoaderBase):
         Returns:
             potential_profile(number array of 1d): potential values
         """
-        pot_profile = self._extract_meta_channel_data('potential', frame_number=None)
-        self.potential_profile = pot_profile
-        self.potential_profile_cal = FitEnginePool.fit_pot_profile(list(range(len(pot_profile))),pot_profile, show_fig = False)
+        try:
+            pot_profile = self._extract_meta_channel_data('potential', frame_number=None)
+            self.potential_profile = pot_profile
+            self.potential_profile_cal = FitEnginePool.fit_pot_profile(list(range(len(pot_profile))),pot_profile, show_fig = False)
+        except:
+            pot_profile = np.zeros(self.total_frame_number)
+            self.potential_profile = pot_profile
+            self.potential_profile_cal = pot_profile
         return pot_profile
 
     def _extract_HKL(self, frame_number):

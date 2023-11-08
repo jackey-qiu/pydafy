@@ -24,6 +24,8 @@ class RunApp(object):
         self.conf_file = config
         #extract global vars from config
         self.kwarg_global = extract_vars_from_config(self.conf_file, section_var ='Global')
+        if type(self.kwarg_global['data_keys'])!=list:
+            self.kwarg_global['data_keys'] = self.kwarg_global['data_keys'].rstrip().rsplit(',')
         for each in self.kwarg_global:
             setattr(self,each,self.kwarg_global[each])
 
