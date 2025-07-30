@@ -171,6 +171,13 @@ class GraphOperations(object):
             [each.autoRange() for each in self.data_profiles]
 
     def update_electron_density_profile(self):
+        if hasattr(self.model.script_module,"model_type"):
+            if getattr(self.model.script_module,"model_type")=="ctr":
+                pass
+            else:
+                return
+        else:
+            return
         if self.lineEdit_z_min.text()!='':
             z_min = float(self.lineEdit_z_min.text())
         else:
@@ -271,7 +278,7 @@ class GraphOperations(object):
                 fmt_symbol = list(fmt.rstrip().rsplit(';')[0].rsplit(':')[1])
                 line_symbol = list(fmt.rstrip().rsplit(';')[1].rsplit(':')[1])
                 if not q_correction:
-                    self.data_profiles[i].plot(self.model.data[_get_index(i+offset)].x, self.model.data[_get_index(i+offset)].y/f_ideal,pen = None,  symbolBrush=fmt_symbol[1], symbolSize=int(fmt_symbol[0]),symbolPen=fmt_symbol[2],clear = False)
+                    self.data_profiles[i].plot(self.model.data[_get_index(i+offset)].x, self.model.data[_get_index(i+offset)].y/f_ideal,pen = None,  symbolBrush=fmt_symbol[1], symbolSize=int(fmt_symbol[0]),symbolPen=fmt_symbol[2],clear = True)
                 else:
                     if self.model.data[_get_index(i+offset)].name == self.comboBox_dataset2.currentText():
                         L_q_correction = self.model.data_original[_get_index(i+offset)].x
@@ -308,7 +315,7 @@ class GraphOperations(object):
                         y_u = self.model.data[_get_index(i+offset)].y[:,np.newaxis] + self.model.data[_get_index(i+offset)].error[:,np.newaxis]/2
                         y = np.append(y_d,y_u,axis = 1)
                         for ii in range(len(y)):
-                            self.data_profiles[i].plot(x=x[ii],y=y[ii],pen={'color':'w', 'width':1},clear = False)
+                            self.data_profiles[i].plot(x=x[ii],y=y[ii],pen={'color':'w', 'width':1},clear = True)
                 
 
                 #plot simulated results

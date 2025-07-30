@@ -316,10 +316,15 @@ class GraphOperations(object):
         #here you should update the self.data_summary info
         self.plot_figure_xrv()
         self.print_data_summary()
+        from dafy.core.util.UtilityFunctions import replace_summary_data_df
+        replace_summary_data_df(self)
+        self._plot_data_summary_xrv()
+    
+    def _plot_data_summary_xrv(self):
         #plain text to be displayed in the data summary tab
         plain_text = []
         #set it manually to True when you want to plot TOF and j/V on the same plot
-        plot_dual_y_axis_TOF_j = False
+        plot_dual_y_axis_TOF_j = True
 
         if self.data_summary!={}:
             self.mplwidget2.fig.clear()
@@ -338,7 +343,8 @@ class GraphOperations(object):
                         'OER_j':r'$j (1.65 V) / mAcm^{-2})$',
                         'q_cv':r'$Q_0\hspace{1} /\hspace{1} mC{\bullet}cm^{-2}$',
                         'q_film': r'$Q_0\hspace{1} /\hspace{1} mC{\bullet}cm^{-2}$',
-                        'OER_j/<dskin>':r'$log(j/V_{skin})\hspace{1}/\hspace{1}mA{\bullet}nm^{-3}$'
+                        # 'OER_j/<dskin>':r'$log(j/V_{skin})\hspace{1}/\hspace{1}mA{\bullet}nm^{-3}$'
+                        'OER_j/<dskin>':r'$(j/<d_{skin}>^{1.6})\hspace{1}/\hspace{1}mA{\bullet}cm^{-2}{\bullet}nm^{-1}$'
                         }
 
             y_label_map_abs = {'potential':'E / V$_{RHE}$',
@@ -379,7 +385,7 @@ class GraphOperations(object):
                 lim_y_temp[each] = [lim_y_temp[each][0]-offset,lim_y_temp[each][1]+offset]
             if use_absolute_value:
                y_label_map = y_label_map_abs
-            gs_left = plt.GridSpec(len(plot_y_labels), len(self.pot_range)+1,hspace=0.02,wspace=0.2)
+            gs_left = plt.GridSpec(len(plot_y_labels), len(self.pot_range)+1,hspace=0.05,wspace=0.2)
             hwspace = eval(self.lineEdit_hwspace.text())
             gs_right = plt.GridSpec(max([2,self.comboBox_link_container.count()]), len(self.pot_range)+1,hspace=hwspace[0],wspace=hwspace[1])
             #print(self.data_summary)
@@ -391,12 +397,28 @@ class GraphOperations(object):
                 output_data = []
                 #use_absolute_value = each_pot[0] == each_pot[1]
                 # use_absolute_value = True
+                style = 'Fouad'
                 for each in plot_y_labels:
                     plot_data_y = np.array([[self.data_summary[each_scan][each][self.pot_range.index(each_pot)*2],self.data_summary[each_scan][each][self.pot_range.index(each_pot)*2+1]] for each_scan in self.scans])
                     plot_data_x = np.arange(len(plot_data_y))
+                    # plot_data_x = list(range(1,len(plot_data_y)+1))
                     labels = ['{}'.format(self.phs[self.scans.index(each_scan)]) for each_scan in self.scans]
                     # ax_temp = self.mplwidget2.canvas.figure.add_subplot(len(plot_y_labels), len(self.pot_range)+1, self.pot_range.index(each_pot)+1+(len(self.pot_range)+1)*plot_y_labels.index(each))
-                    ax_temp = self.mplwidget2.canvas.figure.add_subplot(gs_left[plot_y_labels.index(each), self.pot_range.index(each_pot)])
+                    # ax_temp = self.mplwidget2.canvas.figure.add_subplot(gs_left[plot_y_labels.index(each), self.pot_range.index(each_pot)])
+                    # if each=='grain_size_oop':
+                    #     from brokenaxes import brokenaxes
+                    #     ax_temp = brokenaxes(ylims=((14.3, 15.3), (18.7, 19.1)), subplot_spec=gs_left[plot_y_labels.index(each), self.pot_range.index(each_pot)])
+                    #     self._format_axis([ax_temp])
+                    # else:
+                    if style == 'Fouad':# and (not use_absolute_value) and each=='strain_oop':
+                        if each=='strain_oop':
+                            ax_temp = self.mplwidget2.canvas.figure.add_subplot(gs_left[:2, self.pot_range.index(each_pot)])
+                        elif each=='strain_ip':
+                            continue
+                        else:
+                            ax_temp = self.mplwidget2.canvas.figure.add_subplot(gs_left[plot_y_labels.index(each), self.pot_range.index(each_pot)])
+                    else:
+                        ax_temp = self.mplwidget2.canvas.figure.add_subplot(gs_left[plot_y_labels.index(each), self.pot_range.index(each_pot)])
                     self._format_axis(ax_temp)
                     settings = _extract_setting(each)
                     if settings['use'] and self.checkBox_use.isChecked():
@@ -413,11 +435,90 @@ class GraphOperations(object):
                         ax_temp.plot(plot_data_x,plot_data_y[:,0], '*:',color='0.1')
                         output_data.append(plot_data_y[:,0])
                     else:
-                        ax_temp.bar(plot_data_x,plot_data_y[:,0],0.5, yerr = plot_data_y[:,-1], color = colors_bar)
-                        ax_temp.plot(plot_data_x,plot_data_y[:,0], '*:',color='0.1')
-                        output_data.append(plot_data_y[:,0])
+                        if style == 'Fouad':
+                            output_data.append(plot_data_y[:,0])
+                            if each=='grain_size_ip':
+                                self._format_ax_tick_labels(ax = ax_temp,
+                                    fun_set_bounds = 'set_ylim',#'set_xlim',
+                                    bounds = [0,1],#will be replaced
+                                    bound_padding = 0.1,
+                                    major_tick_location = [18.7,18.8,18.9,19], #x_locator
+                                    show_major_tick_label = True, #show major tick label for the first scan
+                                    num_of_minor_tick_marks=4, #4
+                                    fmt_str = '{:3.1f}')#'{:3.1f}'pass
+                                self._format_axis_customized(ax_temp, bottom=False, labelbottom=False, right=False, left=True, labelright=False, labelleft=True)
+                                for jj in range(0,11):
+                                    ax_temp.errorbar(list(range(0,11))[jj:jj+1],self.summary_data_df['hor_size'][jj:jj+1], yerr=self.summary_data_df['hor_size_err'][jj:jj+1], c = colors_bar[jj], marker = 'o', ms=4)
+                                    #ax_temp.errorbar(list(range(0,11))[jj:jj+1],self.summary_data_df['ver_size'][jj:jj+1], yerr=self.summary_data_df['ver_size_err'][jj:jj+1], c = colors_bar[jj], marker = 's', ms=4)
+                                ax_temp.plot(list(range(0,11)), self.summary_data_df['hor_size'], 'k-')
+                                ax_temp.spines['bottom'].set_visible(False)
+                                d = .015  # how big to make the diagonal lines in axes coordinates
+                                # arguments to pass to plot, just so we don't keep repeating them
+                                #kwargs = dict(transform=ax_temp.transAxes, color='k', clip_on=False)
+                                #ax_temp.plot((-d, +d), (-d, +d), **kwargs)        # top-left diagonal
+                                #ax_temp.plot((1 - d, 1 + d), (-d, +d), **kwargs)  # top-right diagonal
+                                kwargs = dict(transform=ax_temp.transAxes, color='k', clip_on=False)
+                                #kwargs.update(transform=ax_temp.transAxes)  # switch to the bottom axes
+                                ax_temp.plot((-d, +d), (- d, + d), **kwargs)  # bottom-left diagonal
+                                ax_temp.plot((1 - d, 1 + d), (- d, + d), **kwargs)  # bottom-right diagonal                                
+                                #ax_temp.plot(list(range(0,11)), self.summary_data_df['ver_size'], 'k-')
+                                ax_temp.set_ylabel(r'$ d_\parallel$/ nm',fontsize=10)                            
+                            elif each=='grain_size_oop':
+                                self._format_ax_tick_labels(ax = ax_temp,
+                                    fun_set_bounds = 'set_ylim',#'set_xlim',
+                                    bounds = [0,1],#will be replaced
+                                    bound_padding = 0.1,
+                                    major_tick_location = [14.4,14.6,14.8,15.0,15.2], #x_locator
+                                    show_major_tick_label = True, #show major tick label for the first scan
+                                    num_of_minor_tick_marks=4, #4
+                                    fmt_str = '{:3.1f}')#'{:3.1f}'pass
+                                self._format_axis_customized(ax_temp, top=False, labeltop=False, right=False, left=True, labelright=False, labelleft=True)
+                                
+                                for jj in range(0,11):
+                                    #ax_temp.errorbar(list(range(0,11))[jj:jj+1],self.summary_data_df['hor_size'][jj:jj+1], yerr=self.summary_data_df['hor_size_err'][jj:jj+1], c = colors_bar[jj], marker = 'o', ms=4)
+                                    ax_temp.errorbar(list(range(0,11))[jj:jj+1],self.summary_data_df['ver_size'][jj:jj+1], yerr=self.summary_data_df['ver_size_err'][jj:jj+1], c = colors_bar[jj], marker = 's', ms=4)
+                                    #ax_temp.errorbar(list(range(0,11))[jj:jj+1],self.summary_data_df['hor_size'][jj:jj+1], yerr=self.summary_data_df['hor_size_err'][jj:jj+1], c = colors_bar[jj], marker = 's', ms=4)
+                                #ax_temp.plot(list(range(0,11)), self.summary_data_df['hor_size'], 'k-')
+                                ax_temp.plot(list(range(0,11)), self.summary_data_df['ver_size'], 'k-')
+                                ax_temp.spines['top'].set_visible(False)
+                                d = .015  # how big to make the diagonal lines in axes coordinates
+                                # arguments to pass to plot, just so we don't keep repeating them
+                                kwargs = dict(transform=ax_temp.transAxes, color='k', clip_on=False)
+                                ax_temp.plot((-d, +d), (1-d, 1+d), **kwargs)        # top-left diagonal
+                                ax_temp.plot((1 - d, 1 + d), (1-d, 1+d), **kwargs)  # top-right diagonal
+
+                                #kwargs.update(transform=ax_temp.transAxes)  # switch to the bottom axes
+                                #ax_temp.plot((-d, +d), (1 - d, 1 + d), **kwargs)  # bottom-left diagonal
+                                #ax_temp.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)  # bottom-right diagonal                                
+                                #ax_temp.plot(list(range(0,11)), self.summary_data_df['hor_size'], 'k-')
+                                ax_temp.set_ylabel(r'$ d_\perp$ / nm',fontsize=10)
+                            elif each=='strain_oop':
+                                self._format_ax_tick_labels(ax = ax_temp,
+                                    fun_set_bounds = 'set_ylim',#'set_xlim',
+                                    bounds = [0,1],#will be replaced
+                                    bound_padding = 0.03,
+                                    major_tick_location = [0.1,0.2,0.3,0.4,0.5], #x_locator
+                                    show_major_tick_label = True, #show major tick label for the first scan
+                                    num_of_minor_tick_marks=4, #4
+                                    fmt_str = '{:2.1f}')#'{:3.1f}'pass
+                                self._format_axis_customized(ax_temp, right=False, labelbottom=False,left=True, labelright=False, labelleft=True)
+                                for jj in range(0,11):
+                                    ax_temp.errorbar(list(range(0,11))[jj:jj+1],self.summary_data_df['d_hor_size'][jj:jj+1], yerr=self.summary_data_df['d_hor_size_err'][jj:jj+1], c = colors_bar[jj], marker = 'o', ms=4)
+                                    ax_temp.errorbar(list(range(0,11))[jj:jj+1],self.summary_data_df['d_ver_size'][jj:jj+1], yerr=self.summary_data_df['d_ver_size_err'][jj:jj+1], c = colors_bar[jj], marker = 's', ms=4)
+                                ax_temp.plot(list(range(0,11)), self.summary_data_df['d_hor_size'], 'k-')                                
+                                ax_temp.plot(list(range(0,11)), self.summary_data_df['d_ver_size'], 'k-')                                
+                                ax_temp.set_ylabel(r'$\Delta d_\parallel$, $\Delta d_\perp$ / nm',fontsize=10)
+                            else:
+                                ax_temp.bar(plot_data_x,plot_data_y[:,0],0.5, yerr = plot_data_y[:,-1], color = colors_bar)
+                                ax_temp.plot(plot_data_x,plot_data_y[:,0], '*:',color='0.1')
+                                output_data.append(plot_data_y[:,0])
+                        else:
+                            ax_temp.bar(plot_data_x,plot_data_y[:,0],0.5, yerr = plot_data_y[:,-1], color = colors_bar)
+                            ax_temp.plot(plot_data_x,plot_data_y[:,0], '*:',color='0.1')
+                            output_data.append(plot_data_y[:,0])
                     if each_pot == self.pot_range[0]:
-                        ax_temp.set_ylabel(y_label_map[each],fontsize=10)
+                        if style!='Fouad':
+                            ax_temp.set_ylabel(y_label_map[each],fontsize=10)
                         # ax_temp.set_ylim([lim_y_temp[each],0])
                         # ax_temp.set_ylim(lim_y_temp[each])
                     else:
@@ -430,12 +531,21 @@ class GraphOperations(object):
                             ax_temp.set_title('E range:{:4.2f}-->{:4.2f} V'.format(*each_pot), fontsize=10)
                     if each != plot_y_labels[-1]:
                         #ax_temp.set_xticklabels([])
-                        ax_temp.set_xticks(plot_data_x)
-                        ax_temp.set_xticklabels(labels,fontsize=10)
+                        if style!='Fouad':
+                            ax_temp.set_xticks(plot_data_x)
+                            ax_temp.set_xticklabels(labels,fontsize=10)
+                        else:
+                            ax_temp.set_xticks(plot_data_x)
+                            ax_temp.set_xticklabels([str(ii) for ii in range(1,12)],fontsize=10)
                     else:
-                        ax_temp.set_xticks(plot_data_x)
-                        ax_temp.set_xticklabels(labels,fontsize=10)
-                        ax_temp.set_xlabel('pH')
+                        if style!="Fouad":
+                            ax_temp.set_xticks(plot_data_x)
+                            ax_temp.set_xticklabels(labels,fontsize=10)
+                            ax_temp.set_xlabel('pH')
+                        else:
+                            ax_temp.set_xticks(plot_data_x)
+                            ax_temp.set_xticklabels([str(ii) for ii in range(1,12)],fontsize=10)
+                            ax_temp.set_xlabel('Sequence')
                     if each_pot!=self.pot_range[0]:
                         ax_temp.set_yticklabels([])
                 def _extract_data(channel, which_pot_range):
@@ -445,7 +555,7 @@ class GraphOperations(object):
                                 '<dskin>':lambda:self.summary_data_df['d_skin_avg'].to_list()[which_pot_range:data_len:len(self.pot_range)],
                                 'OER_E':lambda:self.summary_data_df['OER_E'].to_list()[which_pot_range:data_len:len(self.pot_range)],
                                 'OER_j':lambda:self.summary_data_df['OER_j'].to_list()[which_pot_range:data_len:len(self.pot_range)],
-                                'OER_j/<dskin>':lambda:(self.summary_data_df['OER_j']/self.summary_data_df['d_skin_avg']).to_list()[which_pot_range:data_len:len(self.pot_range)],
+                                'OER_j/<dskin>':lambda:(self.summary_data_df['OER_j']/(self.summary_data_df['d_skin_avg'])**1.6).to_list()[which_pot_range:data_len:len(self.pot_range)],
                                 'TOF':lambda:(0.3437*self.summary_data_df['OER_j']/self.summary_data_df['d_skin_avg']).to_list()[which_pot_range:data_len:len(self.pot_range)],
                                 'pH':lambda:self.summary_data_df['pH'].to_list()[which_pot_range:data_len:len(self.pot_range)],
                                 'q_film':lambda:self.summary_data_df['q_film'].to_list()[which_pot_range:data_len:len(self.pot_range)],
@@ -496,7 +606,7 @@ class GraphOperations(object):
                     # ax_temp = self.mplwidget2.canvas.figure.add_subplot(len(plot_y_labels), len(self.pot_range)+1, 2+(len(self.pot_range)+1)*i)
                     ax_temp = self.mplwidget2.canvas.figure.add_subplot(gs_right[i,len(self.pot_range)])
                     if plot_dual_y_axis_TOF_j:
-                        if 'TOF' == channels[1]:
+                        if 'TOF' == channels[1] and "input"==channels[0]:
                             ax_temp_right = ax_temp.twinx()
                             self._format_axis_customized(ax_temp, right=False, left=True, labelright=False, labelleft=True)
                             self._format_axis_customized(ax_temp_right, left=False, right=True, labelleft=False, labelright=True)
@@ -543,13 +653,16 @@ class GraphOperations(object):
                         slope_, intercept_, r_value_, *_ = stats.linregress(x_, np.log10(y_)-14)
                         print(f'R2={r_value_}, slope for log(OER_j/<dskin>) as y axis = {slope_}')
                         # ax_temp.set_ylabel('log({})'.format(channels[1]))
+                        ax_temp.set_yscale('log')
                         ax_temp.set_ylabel(y_label_map[channels[1]])
                         # [ax_temp.scatter(x[jj], np.log10(y[jj]), c=colors_bar[jj], marker = '.') for jj in range(len(x))]
                         for jj in range(len(x)):
                             if y_error[jj] == None:
-                                ax_temp.errorbar(x[jj], np.log10(y[jj])-14, xerr=x_error[jj], yerr =None, c=colors_bar[jj], marker = 's', ms = 4)
+                                # ax_temp.errorbar(x[jj], np.log10(y[jj])-14, xerr=x_error[jj], yerr =None, c=colors_bar[jj], marker = 's', ms = 4)
+                                ax_temp.errorbar(x[jj], y[jj], xerr=x_error[jj], yerr =None, c=colors_bar[jj], marker = 's', ms = 4)
                             else:
-                                ax_temp.errorbar(x[jj], np.log10(y[jj])-14, xerr=x_error[jj], yerr = y_error[jj]/y[jj]/np.log(10), c=colors_bar[jj], marker = 's', ms = 4)
+                                # ax_temp.errorbar(x[jj], np.log10(y[jj])-14, xerr=x_error[jj], yerr = y_error[jj]/y[jj]/np.log(10), c=colors_bar[jj], marker = 's', ms = 4)
+                                ax_temp.errorbar(x[jj], y[jj], xerr=x_error[jj], yerr = y_error[jj]/y[jj], c=colors_bar[jj], marker = 's', ms = 4)
                         if self.checkBox_marker.isChecked():
                             [ax_temp.text(x[jj]+x_axis_span/20, np.log10(y[jj]+y_axis_span/20)-14, str(jj+1), ha=HA, va=VA, c=colors_bar[jj], size = 'small') for jj in range(len(x))]
                         if getattr(self, f'checkBox_panel{i+1}').isChecked():
@@ -558,6 +671,8 @@ class GraphOperations(object):
                         slope_, intercept_, r_value_, *_ = stats.linregress(np.log10(x_)-14, y_)
                         # ax_temp.set_xlabel('log({})'.format(channels[0]))
                         ax_temp.set_xlabel(y_label_map[channels[0]])
+                        ax_temp.set_yscale('log')
+                        #'OER_j/<dskin>':r'$log(j/V_{skin})\hspace{1}/\hspace{1}mA{\bullet}nm^{-3}$'
                         # [ax_temp.scatter(np.log10(x[jj]), y[jj], c=colors_bar[jj], marker = '.') for jj in range(len(x))]
                         for jj in range(len(x)):
                             if x_error[jj] == None:
@@ -569,33 +684,64 @@ class GraphOperations(object):
                         if getattr(self, f'checkBox_panel{i+1}').isChecked():
                             ax_temp.plot(np.log10(x), np.log10(x)*slope_ + intercept_, '-k')
                     elif 'TOF' == channels[1]:
-                        #scale_factor of 0.3437 has been applied to j/<d> to convert to TOF: TOF = sf * (j/<d>)
-                        #note j in mA/cm2, d in nm
-                        #read details from Wiegmann_2022 (https://doi.org/10.1021/acscatal.1c05169): last paragraph in section 4.2
-                        #-14 term is due to the unit of cm-2 transformed to nm-2, the scalling factor will be 10-14 becoming -14 after applying the log
-                        slope_, intercept_, r_value_, *_ = stats.linregress(x_, np.log10(y_))
-                        print(f'R2={r_value_}, slope for log(TOF) as y axis = {slope_}')
-                        # ax_temp.set_ylabel('log({})'.format(channels[1]))
-                        ax_temp.set_ylabel(y_label_map[channels[1]])
-                        if plot_dual_y_axis_TOF_j:
-                            ax_temp_right.set_ylabel(r'$(j/V_{skin})\hspace{1}/\hspace{1}mA{\bullet}nm^{-3}$')
-                        # [ax_temp.scatter(x[jj], np.log10(y[jj]), c=colors_bar[jj], marker = '.') for jj in range(len(x))]
-                        for jj in range(len(x)):
-                            if y_error[jj] == None:
-                                ax_temp.errorbar(x[jj], y[jj], xerr=x_error[jj], yerr =None, c=colors_bar[jj], marker = 's', ms = 4)
-                                # ax_temp_right.errorbar(x[jj], y[jj]/0.3437, xerr=x_error[jj], yerr =None, c=colors_bar[jj], marker = 's', ms = 4)
-                            else:
-                                ax_temp.errorbar(x[jj], y[jj], xerr=x_error[jj], yerr = y_error[jj], c=colors_bar[jj], marker = 's', ms = 4)
-                                # ax_temp_right.errorbar(x[jj], y[jj]/0.3437, xerr=x_error[jj], yerr = y_error[jj], c=colors_bar[jj], marker = 's', ms = 4)
-                        if self.checkBox_marker.isChecked():
-                            [ax_temp.text(x[jj]+x_axis_span/20, y[jj]+y_axis_span/20, str(jj+1), ha=HA, va=VA,c=colors_bar[jj], size = 'small') for jj in range(len(x))]
-                        if getattr(self, f'checkBox_panel{i+1}').isChecked():
-                            ax_temp.plot(x_, 10**(np.array(x_)*slope_ + intercept_), '-k')
-                        ax_temp.set_yscale('log')
-                        if plot_dual_y_axis_TOF_j:
-                            ax_temp_right.set_yscale('log')
+                        if style=='Fouad' and channels[0]=='input':
+                            #scale_factor of 0.3437 has been applied to j/<d> to convert to TOF: TOF = sf * (j/<d>)
+                            #note j in mA/cm2, d in nm
+                            #read details from Wiegmann_2022 (https://doi.org/10.1021/acscatal.1c05169): last paragraph in section 4.2
+                            #-14 term is due to the unit of cm-2 transformed to nm-2, the scalling factor will be 10-14 becoming -14 after applying the log
+                            #slope_, intercept_, r_value_, *_ = stats.linregress(x_, np.log10(y_))
+                            #print(f'R2={r_value_}, slope for log(TOF) as y axis = {slope_}')
+                            # ax_temp.set_ylabel('log({})'.format(channels[1]))
+                            ax_temp.set_ylabel( r'$TOF\ at\ pH\ 13\ / \ s^{-1}$')
+                            if plot_dual_y_axis_TOF_j:
+                                ax_temp_right.set_ylabel(r'$<d_{skin}>$ / nm')
+                            x_ph13 = list(range(1,5))
+                            tof_ph13 = [y[ii] for ii in [0,4,8,10]]
+                            skin_ph13 = [list(self.summary_data_df['d_skin_avg'])[ii] for ii in [0,4,8,10]]
+                            ax_temp.plot(x_ph13, tof_ph13, 'rs')
+                            ax_temp.yaxis.label.set_color('red')
+                            ax_temp.tick_params(axis='y',labelcolor='red')
                             #with log scale, TOF data points are just shift down by log10(0.3437) compared to (j/V), therefore to only show one set of points, let us shift the y_lim accordingly
-                            ax_temp_right.set_ylim(*np.array(ax_temp.get_ylim())/0.3437)
+                            ax_temp_right.plot(x_ph13, skin_ph13, 'bs')
+                            ax_temp_right.yaxis.label.set_color('blue')
+                            ax_temp_right.tick_params(axis='y',labelcolor='blue')
+                            self._format_ax_tick_labels(ax = ax_temp_right,
+                                                        fun_set_bounds = 'set_ylim',#'set_xlim',
+                                                        bounds = [0,1],#will be replaced
+                                                        bound_padding = 0.05,
+                                                        major_tick_location = [0.7,0.8,0.9], #x_locator
+                                                        show_major_tick_label = True, #show major tick label for the first scan
+                                                        num_of_minor_tick_marks=4, #4
+                                                        fmt_str = '{:3.1f}')#'{:3.1f}'
+    
+                        else:
+                            #scale_factor of 0.3437 has been applied to j/<d> to convert to TOF: TOF = sf * (j/<d>)
+                            #note j in mA/cm2, d in nm
+                            #read details from Wiegmann_2022 (https://doi.org/10.1021/acscatal.1c05169): last paragraph in section 4.2
+                            #-14 term is due to the unit of cm-2 transformed to nm-2, the scalling factor will be 10-14 becoming -14 after applying the log
+                            slope_, intercept_, r_value_, *_ = stats.linregress(x_, np.log10(y_))
+                            print(f'R2={r_value_}, slope for log(TOF) as y axis = {slope_}')
+                            ax_temp.set_ylabel(y_label_map[channels[1]])
+                            # if plot_dual_y_axis_TOF_j:
+                                # ax_temp_right.set_ylabel(r'$(j/V_{skin})\hspace{1}/\hspace{1}mA{\bullet}nm^{-3}$')
+                            for jj in range(len(x)):
+                                if y_error[jj] == None:
+                                    ax_temp.errorbar(x[jj], y[jj], xerr=x_error[jj], yerr =None, c=colors_bar[jj], marker = 's', ms = 4)
+                                    # ax_temp_right.errorbar(x[jj], y[jj]/0.3437, xerr=x_error[jj], yerr =None, c=colors_bar[jj], marker = 's', ms = 4)
+                                else:
+                                    ax_temp.errorbar(x[jj], y[jj], xerr=x_error[jj], yerr = y_error[jj], c=colors_bar[jj], marker = 's', ms = 4)
+                                #CoOOH
+                                ax_temp.errorbar([8], [0.01], xerr=None, yerr = None, c="k", marker = 'D', ms = 4)
+                                ax_temp.errorbar([13], [0.73], xerr=None, yerr = None, c="b", marker = 'D', ms = 4)
+                            if self.checkBox_marker.isChecked():
+                                [ax_temp.text(x[jj]+x_axis_span/20, y[jj]+y_axis_span/20, str(jj+1), ha=HA, va=VA,c=colors_bar[jj], size = 'small') for jj in range(len(x))]
+                            if getattr(self, f'checkBox_panel{i+1}').isChecked():
+                                ax_temp.plot(x_, 10**(np.array(x_)*slope_ + intercept_), '-k')
+                            ax_temp.set_yscale('log')
+                            # if plot_dual_y_axis_TOF_j:
+                                # ax_temp_right.set_yscale('log')
+                                #with log scale, TOF data points are just shift down by log10(0.3437) compared to (j/V), therefore to only show one set of points, let us shift the y_lim accordingly
+                                # ax_temp_right.set_ylim(*np.array(ax_temp.get_ylim())/0.3437)                            
                     elif 'TOF' == channels[0]:
                         slope_, intercept_, r_value_, *_ = stats.linregress(np.log10(x_), y_)
                         # ax_temp.set_ylabel('log({})'.format(channels[1]))
@@ -614,7 +760,11 @@ class GraphOperations(object):
                     else:
                         slope_, intercept_, r_value_, *_ = stats.linregress(x_, y_)
                         # [ax_temp.scatter(x[jj], y[jj], c=colors_bar[jj], marker = '.') for jj in range(len(x))]
-                        [ax_temp.errorbar(x[jj], y[jj], xerr = x_error[jj], yerr = y_error[jj], c=colors_bar[jj], marker = 's', ms = 4) for jj in range(len(x))]
+                        if channels[0]=='input':
+                            [ax_temp.errorbar(x[jj], y[jj], xerr = x_error[jj], yerr = y_error[jj], c=colors_bar[jj], marker = 's', ms = 4) for jj in range(len(x))]
+                            ax_temp.plot(x, y, color='k')
+                        else:
+                            [ax_temp.errorbar(x[jj], y[jj], xerr = x_error[jj], yerr = y_error[jj], c=colors_bar[jj], marker = 's', ms = 4) for jj in range(len(x))]
                         if self.checkBox_marker.isChecked():
                             [ax_temp.text(x[jj]+x_axis_span/20, y[jj]+y_axis_span/20, str(jj+1), ha=HA, va=VA,c=colors_bar[jj], size = 'small') for jj in range(len(x))]
                         if getattr(self, f'checkBox_panel{i+1}').isChecked():
@@ -628,9 +778,11 @@ class GraphOperations(object):
                 # print(each_pot)
                 plain_text.append(f'<p>\npot = {each_pot} V</p>')
                 plain_text.append('<p>scan_no\tstrain_ip\tstrain_oop\tgrain_size_ip\tgrain_size_oop\tpH</p>')
+                '''
                 for each_row in output_data:
                     # print("{:3.0f}\t{:6.3f}\t{:6.3f}\t{:6.3f}\t{:6.3f}\t{:2.0f}".format(*each_row))
                     plain_text.append("<p>{:3.0f}\t{:6.3f}\t{:6.3f}\t{:6.3f}\t{:6.3f}\t\t{:2.0f}</p>".format(*each_row))
+                '''
             #self.mplwidget2.fig.subplots_adjust(hspace=0.5, wspace=0.2)
             self.mplwidget2.canvas.draw()
             # self.plainTextEdit_summary.setPlainText('\n'.join(plain_text))
@@ -931,16 +1083,16 @@ class GraphOperations(object):
             seperators = list(set(marker_index_container))
         if channel!='current':
             #plot the channel values now
-            getattr(self,'plot_axis_scan{}'.format(scan))[channel_index].plot(self.data_to_plot[scan][self.plot_label_x[self.scans.index(scan)]],y_values,fmt,markersize = self.spinBox_marker_size.value())
+            getattr(self,'plot_axis_scan{}'.format(scan))[channel_index].plot(self.data_to_plot[scan][self.plot_label_x[self.scans.index(scan)]],y_values,fmt,markersize = self.spinBox_marker_size.value(), alpha = 0.35)
             if self.checkBox_merge.isChecked():
                 if scan!=self.scans[0]:
-                    getattr(self,'plot_axis_scan{}'.format(self.scans[0]))[channel_index].plot(self.data_to_plot[scan][self.plot_label_x[self.scans.index(scan)]],y_values,fmt,markersize = self.spinBox_marker_size.value())
+                    getattr(self,'plot_axis_scan{}'.format(self.scans[0]))[channel_index].plot(self.data_to_plot[scan][self.plot_label_x[self.scans.index(scan)]],y_values, markersize = self.spinBox_marker_size.value())
             if self.checkBox_show_smoothed_curve.isChecked():
                 # x, y = self.data_to_plot[scan][self.plot_label_x[self.scans.index(scan)]], y_values_smooth
                 # z = np.linspace(0, 1, len(x))
                 # line_segment = colorline(x, y, z, cmap=plt.get_cmap('binary'), linewidth=3)
                 # getattr(self,'plot_axis_scan{}'.format(scan))[channel_index].add_collection(line_segment)
-                getattr(self,'plot_axis_scan{}'.format(scan))[channel_index].plot(self.data_to_plot[scan][self.plot_label_x[self.scans.index(scan)]],y_values_smooth,'-', color = '0.4')
+                getattr(self,'plot_axis_scan{}'.format(scan))[channel_index].plot(self.data_to_plot[scan][self.plot_label_x[self.scans.index(scan)]],y_values_smooth,fmt,linestyle= '-', markersize=0)
             #plot the slope line segments
             cases = self._plot_slope_segment(scan = scan, channel = channel, channel_index = channel_index, y_values_smooth = y_values_smooth,
                                         slope_info = slope_info, seperators = seperators,  marker_index_container = marker_index_container)

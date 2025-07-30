@@ -101,7 +101,7 @@ class ViewOperations(object):
             else:
                 return
         else:
-            pass
+            return
         try:
             if self.spinBox_domain.text()=="":
                 domain_tag = 0

@@ -382,7 +382,15 @@ class RunControl(object):
             self.statusbar.clearMessage()
             self.update_combo_box_list_par_set()
             # self.textBrowser_error_msg.clear()
-            self.spinBox_domain.setMaximum(len(self.model.script_module.sample.domain)-1)
+            if hasattr(self.model.script_module,"model_type"):
+                if getattr(self.model.script_module,"model_type")=="ctr":
+                    self.spinBox_domain.setMaximum(len(self.model.script_module.sample.domain)-1)
+                    #pass
+                else:
+                    return
+            else:
+                pass
+            #self.spinBox_domain.setMaximum(len(self.model.script_module.sample.domain)-1)
             self.statusbar.showMessage("Model is simulated successfully!")
             logging.root.info("Model is simulated successfully!")
         except model.ModelError as e:

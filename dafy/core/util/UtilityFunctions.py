@@ -46,6 +46,72 @@ from PyQt5.QtWidgets import QMessageBox
 from functools import wraps
 import glob
 
+def inject_ref_data_into_master(main_gui, scans = [216,226,229,235,236,243,244], fmts = ['-r','-m','-r','-g','-r','-c','-r']):
+    import pandas as pd
+    ref_data = pd.read_csv('C:\\Users\\qiucanro\\Downloads\\Reflectivity data_Fouad.DAT', sep='\t',header=0) 
+    for i, scan in enumerate(scans):
+        data_216=ref_data[ref_data['Scan']==scan]
+        getattr(main_gui, f'plot_axis_scan{scan}')[1].clear()
+        getattr(main_gui, f'plot_axis_scan{scan}')[1].plot(list(data_216['VRHE']), list(data_216['Reflectivity']), fmts[i])
+        main_gui._format_ax_tick_labels(ax = getattr(main_gui, f'plot_axis_scan{scan}')[1],
+                                                fun_set_bounds = 'set_ylim',#'set_xlim',
+                                                bounds = [0.89,1.03],#[0.4,2.1],#[0.95,1.95],
+                                                bound_padding = float(0.005),
+                                                major_tick_location = [0.88, 0.92,0.96,1.00,1.04], #x_locator
+                                                show_major_tick_label = scan==216, #show major tick label for the first scan
+                                                num_of_minor_tick_marks=4, #4
+                                                fmt_str = '{:3.2f}')
+        main_gui._format_ax_tick_labels(ax = getattr(main_gui, f'plot_axis_scan{scan}')[1],
+                                                fun_set_bounds = 'set_xlim',#'set_xlim',
+                                                bounds = [0.8,2.0],#[0.4,2.1],#[0.95,1.95],
+                                                bound_padding = float(0.06),
+                                                major_tick_location = [1.0,1.2,1.4,1.6,1.8], #x_locator
+                                                show_major_tick_label = False, #show major tick label for the first scan
+                                                num_of_minor_tick_marks=3, #4
+                                                fmt_str = '{:3.1f}')        
+    getattr(main_gui, f'plot_axis_scan{216}')[1].set_ylabel(r'Reflectivity  (V)', fontsize=13)
+
+def replace_summary_data_df(main_gui):
+    # new_data = pd.read_csv('C:\\Users\\qiucanro\\Downloads\\structural data analysis_Fouad.DAT',sep='\t',header=0)
+    new_data = pd.read_csv('C:\\Users\\qiucanro\\Downloads\\structural data analysis_Jackey_2.DAT',sep='\t',header=0)
+    d_skin_avg = new_data['dskin']
+    d_skin_avg_err = new_data['dskinErr']
+    d_bulk_vol = new_data['DeltaVonV']
+    d_bulk_vol_err = new_data['DeltaVonVEr']
+    skin_vol_fraction = new_data['VskinonV']
+    skin_vol_fraction_err = new_data['DelVskinVEr']
+    hor_size = new_data['dpara']
+    hor_size_err = new_data['dparaErr']
+    d_hor_size = new_data['deltadpara']
+    d_hor_size_err = new_data['deltaparaEr']
+    ver_size = new_data['dperp']
+    ver_size_err = new_data['dperpErr']
+    d_ver_size = new_data['deltadperp']
+    d_ver_size_err = new_data['deltadperEr']
+    OER_j = [2.384,0.372,0.376,0.353,2.14,0.115,0.106,0.088,1.677,0.065,1.027]
+
+
+
+    main_gui.summary_data_df['d_skin_avg'] = d_skin_avg
+    main_gui.summary_data_df['d_skin_avg_err'] = d_skin_avg_err
+    main_gui.summary_data_df['d_bulk_vol'] = d_bulk_vol
+    main_gui.summary_data_df['d_bulk_vol_err'] = d_bulk_vol_err
+    main_gui.summary_data_df['skin_vol_fraction'] = skin_vol_fraction
+    main_gui.summary_data_df['skin_vol_fraction_err'] = skin_vol_fraction_err
+
+    main_gui.summary_data_df['hor_size'] = hor_size
+    main_gui.summary_data_df['hor_size_err'] = hor_size_err
+    main_gui.summary_data_df['d_hor_size'] = d_hor_size
+    main_gui.summary_data_df['d_hor_size_err'] = d_hor_size_err
+    main_gui.summary_data_df['ver_size'] = ver_size
+    main_gui.summary_data_df['ver_size_err'] = ver_size_err
+    main_gui.summary_data_df['d_ver_size'] = d_ver_size
+    main_gui.summary_data_df['d_ver_size_err'] = d_ver_size_err
+    main_gui.summary_data_df['OER_j'] = OER_j
+
+
+    main_gui._plot_data_summary_xrv()
+
 class DocInherit(object):
     """
     doc_inherit decorator
